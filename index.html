@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>神戶大阪 5 天 4 夜 精華行程</title>
+    <title>神戶大阪 5 天 4 夜 精華行程 (私人)</title>
     <!-- 引入 Bootstrap CSS 5.3 進行美化和響應式設計 -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" xintegrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
     <!-- 引入 Font Awesome Icons -->
@@ -12,6 +12,7 @@
         body {
             background-color: #f7f9fc;
             font-family: 'Inter', sans-serif;
+            min-height: 100vh;
         }
         .travel-header {
             background: linear-gradient(135deg, #007bff, #00c6ff);
@@ -28,7 +29,7 @@
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
             margin-bottom: 1.5rem;
-            border-left: 5px solid #007bff; /* 主題色邊框 */
+            border-left: 5px solid #007bff;
             overflow: hidden;
         }
         .day-card:hover {
@@ -39,6 +40,14 @@
             font-size: 1.5rem;
             font-weight: bold;
             color: #007bff;
+        }
+        .login-container {
+            max-width: 400px;
+            margin: 5rem auto;
+            padding: 2rem;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
         }
         .loading-state {
             text-align: center;
@@ -54,29 +63,50 @@
     <header class="travel-header">
         <div class="container text-center">
             <h1 class="display-4"><i class="fas fa-plane-departure me-2"></i> 神戶大阪 5 天 4 夜</h1>
-            <p class="lead">精彩關西之旅，數據來自 Firebase Firestore 實時同步。</p>
+            <p class="lead">精彩關西之旅，**僅限登入使用者存取**。</p>
         </div>
     </header>
 
-    <!-- 行程內容區塊 -->
+    <!-- 主內容容器 -->
     <main class="container">
-        <!-- 讀取狀態或錯誤訊息會顯示在此 -->
-        <div id="itinerary-status" class="loading-state">
-            <i class="fas fa-spinner fa-spin me-2"></i> 正在從 Firebase 載入行程...
-        </div>
-        
-        <!-- 行程卡片將被 JavaScript 插入此處 -->
-        <div id="itinerary-list" class="row">
-            <!-- 範例卡片結構 (JS會生成類似的內容) -->
-            <!--
-            <div class="col-lg-6">
-                <div class="day-card p-4">
-                    <div class="day-marker">DAY 1</div>
-                    <h5>大阪環球影城</h5>
-                    <p class="text-muted">全天暢玩，超級任天堂世界！</p>
-                </div>
+        <!-- 登入表單 (預設隱藏，未登入時顯示) -->
+        <div id="login-screen" class="login-container text-center" style="display: none;">
+            <h4 class="mb-4 text-primary">行程登入</h4>
+            <div id="login-error" class="alert alert-danger" style="display: none;"></div>
+            
+            <div class="form-floating mb-3">
+                <input type="email" class="form-control rounded-lg" id="email-input" placeholder="name@example.com">
+                <label for="email-input">電子郵件</label>
             </div>
-            -->
+            <div class="form-floating mb-4">
+                <input type="password" class="form-control rounded-lg" id="password-input" placeholder="密碼">
+                <label for="password-input">密碼</label>
+            </div>
+            
+            <button id="login-button" class="btn btn-primary w-100 py-2 rounded-lg" onclick="handleLogin()">
+                <i class="fas fa-sign-in-alt me-2"></i> 登入行程
+            </button>
+            <small class="text-muted mt-3 d-block">請使用 Firebase Authentication 中已授權的帳號。</small>
+        </div>
+
+        <!-- 行程內容區塊 (預設隱藏，登入後顯示) -->
+        <div id="itinerary-content" style="display: none;">
+             <div class="d-flex justify-content-between align-items-center mb-4">
+                <p class="text-muted mb-0">您已成功登入，行程數據正在實時同步...</p>
+                <button class="btn btn-sm btn-outline-secondary" onclick="handleLogout()">
+                    <i class="fas fa-sign-out-alt me-1"></i> 登出
+                </button>
+            </div>
+
+            <!-- 讀取狀態或錯誤訊息會顯示在此 -->
+            <div id="itinerary-status" class="loading-state">
+                <i class="fas fa-spinner fa-spin me-2"></i> 正在從 Firestore 載入行程...
+            </div>
+            
+            <!-- 行程卡片將被 JavaScript 插入此處 -->
+            <div id="itinerary-list" class="row">
+                <!-- Data will be populated here -->
+            </div>
         </div>
     </main>
 
@@ -85,12 +115,13 @@
         <p><i class="fas fa-database me-1"></i> Data powered by Firebase Firestore.</p>
     </footer>
 
-    <!-- 2. 引入 Firebase SDK (請使用 8.10.0 的 Namespaced 版本，因為靜態 HTML 不支援模組化語法) -->
+    <!-- 1. 引入 Firebase SDK (Namespaced 語法) -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
 
     <script>
-        // 設定您的 Firebase Config (來自您的貼文)
+        // 設定您的 Firebase Config (請確保這與您的專案一致)
         const firebaseConfig = {
             apiKey: "AIzaSyBsMiLUgtJtcv48iRp_9QFx5fShtRd6Lro",
             authDomain: "kobe-osaka-2026travel.firebaseapp.com",
@@ -101,24 +132,47 @@
         };
 
         // DOM 元素參考
+        const loginScreen = document.getElementById('login-screen');
+        const itineraryContent = document.getElementById('itinerary-content');
         const itineraryList = document.getElementById('itinerary-list');
         const itineraryStatus = document.getElementById('itinerary-status');
+        const loginErrorDiv = document.getElementById('login-error');
+        
+        let db;
+        let auth;
+        let unsubscribe = null; // 用來儲存 onSnapshot 的取消函數
 
-        // 初始化 Firebase (使用 Namespaced 語法)
+        // 1. 初始化 Firebase 服務
         try {
             firebase.initializeApp(firebaseConfig);
-            const db = firebase.firestore();
+            db = firebase.firestore();
+            auth = firebase.auth();
+        } catch (error) {
+            console.error("Firebase 初始化失敗:", error);
+            document.body.innerHTML = '<div class="alert alert-danger text-center m-5" role="alert">Firebase 初始化失敗。請檢查設定。</div>';
+        }
 
-            // 實時監聽資料庫變化 (onSnapshot)
-            // 監聽 'itinerary' 集合，並依文件 ID 排序 (Day1, Day2, ...)
-            db.collection("itinerary").orderBy(firebase.firestore.FieldPath.documentId(), "asc")
+        /**
+         * 處理行程資料的實時監聽與渲染
+         * 只有在使用者登入時才會被呼叫
+         */
+        function startItineraryListener() {
+            // 清除之前的監聽器，避免重複呼叫
+            if (unsubscribe) {
+                unsubscribe();
+            }
+
+            itineraryStatus.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> 正在從 Firestore 載入行程...';
+            itineraryList.innerHTML = '';
+
+            // 實時監聽 'itinerary' 集合，並依文件 ID 排序
+            unsubscribe = db.collection("itinerary").orderBy(firebase.firestore.FieldPath.documentId(), "asc")
                 .onSnapshot((querySnapshot) => {
-                    // 清空之前的內容
                     itineraryList.innerHTML = ''; 
                     itineraryStatus.innerHTML = '';
                     
                     if (querySnapshot.empty) {
-                        itineraryStatus.innerHTML = '<div class="alert alert-warning text-center" role="alert"><i class="fas fa-exclamation-triangle me-2"></i> 資料庫中沒有找到行程資料 (itinerary 集合)。請新增 Day1, Day2 等文件。</div>';
+                        itineraryStatus.innerHTML = '<div class="alert alert-warning text-center" role="alert"><i class="fas fa-exclamation-triangle me-2"></i> 資料庫中沒有找到行程資料 (itinerary 集合)。</div>';
                         return;
                     }
 
@@ -126,7 +180,7 @@
                     querySnapshot.forEach((doc) => {
                         const data = doc.data();
                         
-                        // 嘗試從文件 ID (例如: 'Day1') 中提取數字，若失敗則使用完整 ID
+                        // 嘗試從文件 ID (例如: 'Day1') 中提取數字
                         const dayMatch = doc.id.match(/Day(\d+)/i);
                         const dayDisplay = dayMatch ? `DAY ${dayMatch[1]}` : doc.id.toUpperCase();
 
@@ -144,16 +198,79 @@
                     });
 
                 }, (error) => {
-                    // 處理錯誤
-                    console.error("實時監聽資料失敗: ", error);
-                    itineraryStatus.innerHTML = '<div class="alert alert-danger text-center" role="alert"><i class="fas fa-exclamation-circle me-2"></i> 連線錯誤，請檢查 Firebase 設定或網路連線。</div>';
+                    // 由於 Firestore 規則已設定，若未登入，這裡會拋出 'PERMISSION_DENIED' 錯誤
+                    console.error("實時監聽資料失敗 (連線/權限錯誤): ", error);
+                    itineraryStatus.innerHTML = '<div class="alert alert-danger text-center" role="alert"><i class="fas fa-exclamation-circle me-2"></i> 資料讀取失敗：您可能沒有權限存取此行程。</div>';
                 });
-            
-        } catch (error) {
-            console.error("Firebase 初始化失敗:", error);
-            itineraryStatus.innerHTML = '<div class="alert alert-danger text-center" role="alert"><i class="fas fa-bug me-2"></i> Firebase 設定錯誤。請檢查您的 apiKey 或專案 ID。</div>';
         }
 
+        /**
+         * 處理登入邏輯
+         */
+        async function handleLogin() {
+            const email = document.getElementById('email-input').value;
+            const password = document.getElementById('password-input').value;
+            const button = document.getElementById('login-button');
+
+            loginErrorDiv.style.display = 'none';
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> 登入中...';
+
+            try {
+                await auth.signInWithEmailAndPassword(email, password);
+                // onAuthStateChanged 會處理後續的介面更新
+            } catch (error) {
+                console.error("登入失敗:", error.code, error.message);
+                loginErrorDiv.textContent = '登入失敗：電子郵件或密碼不正確。';
+                loginErrorDiv.style.display = 'block';
+                button.disabled = false;
+                button.innerHTML = '<i class="fas fa-sign-in-alt me-2"></i> 登入行程';
+            }
+        }
+
+        /**
+         * 處理登出邏輯
+         */
+        function handleLogout() {
+            auth.signOut().then(() => {
+                // onAuthStateChanged 會處理介面切換
+                if (unsubscribe) {
+                    unsubscribe();
+                }
+            }).catch((error) => {
+                console.error("登出失敗:", error);
+            });
+        }
+
+        // 將登入/登出函數暴露給 HTML 呼叫
+        window.handleLogin = handleLogin;
+        window.handleLogout = handleLogout;
+
+
+        // 3. 監聽 Firebase 身份驗證狀態變化
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                // 使用者已登入：隱藏登入介面，顯示行程內容
+                loginScreen.style.display = 'none';
+                itineraryContent.style.display = 'block';
+                // 啟動 Firestore 實時監聽
+                startItineraryListener();
+            } else {
+                // 使用者未登入：顯示登入介面，隱藏行程內容
+                loginScreen.style.display = 'block';
+                itineraryContent.style.display = 'none';
+                
+                // 確保登入按鈕狀態恢復
+                const button = document.getElementById('login-button');
+                button.disabled = false;
+                button.innerHTML = '<i class="fas fa-sign-in-alt me-2"></i> 登入行程';
+
+                // 清除 Firestore 監聽器
+                if (unsubscribe) {
+                    unsubscribe();
+                }
+            }
+        });
     </script>
 </body>
 </html>
