@@ -3,210 +3,122 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>登入 | 神戶大阪行程規劃</title>
-    <!-- 引入 Tailwind CSS (用於全部造型和響應式設計) -->
+    <title>Firebase 連線與身份驗證</title>
+    <!-- 載入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入 Font Awesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
-        /* 使用 Noto Sans CJK TC 確保中文字體顯示清晰 */
+        /* 使用 Inter 字體並確保全寬佈局 */
         body {
-            font-family: "Noto Sans CJK TC", "Inter", sans-serif;
-            min-height: 100vh;
-            background-color: #f7f9fb; /* 淺灰色背景 */
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f7f7;
         }
-        /* 模擬日本風格的藍色主題 */
-        .kobe-osaka-blue {
-            background: linear-gradient(145deg, #1e40af 0%, #3b82f6 100%); /* 深藍到淺藍漸變 */
-        }
-        /* 確保全螢幕高度，尤其在行動裝置上 */
-        .full-screen-container {
-            padding: 1rem; 
-            width: 100%; /* 確保在任何螢幕上都能佔滿寬度 */
+        .container {
+            max-width: 800px;
         }
     </style>
 </head>
-<body>
+<body class="p-4 sm:p-8 min-h-screen flex items-start justify-center">
 
-    <div class="full-screen-container w-full max-w-md mx-auto flex flex-col justify-center items-center">
+    <div class="container w-full bg-white shadow-xl rounded-xl p-6 md:p-10">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6 border-b pb-2">Firebase 服務初始化</h1>
 
-        <!-- App 標題區 -->
-        <header class="text-center mb-8 pt-10 sm:pt-0">
-            <div class="kobe-osaka-blue p-3 rounded-full inline-block shadow-lg">
-                <i class="fas fa-route text-white text-3xl"></i>
-            </div>
-            <h1 class="text-3xl font-extrabold text-gray-800 mt-3">神戶大阪之旅</h1>
-            <p class="text-gray-500 text-sm">行程共享與規劃 - 僅限登入</p>
-        </header>
-
-        <!-- 登入卡片 -->
-        <div class="w-full bg-white rounded-2xl shadow-2xl p-6 sm:p-8 border border-gray-100">
-            
-            <h3 class="text-2xl font-bold text-gray-700 text-center mb-6 border-b pb-4">帳號登入</h3>
-            
-            <!-- 錯誤訊息顯示區 -->
-            <div id="auth-error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-4" style="display: none;">
-                <!-- 錯誤訊息將顯示在這裡 -->
-            </div>
-            
-            <!-- 表單區 -->
-            <form id="auth-form" onsubmit="event.preventDefault(); handleLogin()">
-                <div class="space-y-5">
-                    
-                    <!-- Email 輸入 -->
-                    <div>
-                        <label for="email" class="block text-sm font-medium text-gray-700 mb-1">電子郵件</label>
-                        <div class="relative">
-                            <i class="fas fa-envelope absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                            <input type="email" id="email" class="w-full p-3 pl-10 border border-gray-300 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 transition" required placeholder="name@example.com">
-                        </div>
-                    </div>
-
-                    <!-- 密碼輸入 -->
-                    <div>
-                        <label for="password" class="block text-sm font-medium text-gray-700 mb-1">密碼</label>
-                        <div class="relative">
-                            <i class="fas fa-lock absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                            <input type="password" id="password" class="w-full p-3 pl-10 border border-gray-300 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 transition" required placeholder="請輸入密碼">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 提交按鈕 -->
-                <button type="submit" id="submit-button" class="mt-8 w-full kobe-osaka-blue text-white p-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition duration-300 active:scale-98">
-                    <i class="fas fa-sign-in-alt mr-2"></i> 登入
-                </button>
-            </form>
+        <div id="status" class="w-full text-center p-4 rounded-lg font-medium text-lg 
+                                  bg-yellow-100 text-yellow-800 transition duration-300">
+            正在初始化 Firebase 與身份驗證...
         </div>
-        
-        <p class="text-xs text-gray-400 mt-4 pb-10 sm:pb-0">請使用已註冊的帳號登入。</p>
+
+        <div class="mt-8">
+            <h2 class="text-xl font-semibold text-gray-700 mb-3">Firebase 配置詳細資訊</h2>
+            
+            <div id="config-display" class="bg-gray-50 p-4 rounded-lg text-sm break-all">
+                <p><span class="font-medium text-gray-600">App ID:</span> <span id="app-id-display">N/A</span></p>
+                <p><span class="font-medium text-gray-600">Project ID:</span> <span id="project-id-display">N/A</span></p>
+                <p><span class="font-medium text-gray-600">API Key Exists:</span> <span id="api-key-status" class="font-semibold text-red-500">No</span></p>
+                <p class="mt-3"><span class="font-medium text-gray-600">Firestore Path Example (Public):</span> <code>/artifacts/&lt;appId&gt;/public/data/items</code></p>
+                <p><span class="font-medium text-gray-600">Firestore Path Example (Private):</span> <code>/artifacts/&lt;appId&gt;/users/&lt;userId&gt;/data/items</code></p>
+            </div>
+        </div>
     </div>
 
-    <!-- 核心 JavaScript 邏輯 (包含 Firebase v9+ Modular SDK) -->
     <script type="module">
-        // 導入 Firebase v9+ 模組
+        // 匯入 Firebase 核心模組、Auth 與 Firestore 服務
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { 
-            getAuth, 
-            signInWithEmailAndPassword, 
-            signInWithCustomToken, 
-            signInAnonymously, 
-            onAuthStateChanged 
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        
-        // --- Canvas 環境全域變數處理 (REQUIRED) ---
-        // 優先使用 Canvas 提供的配置，如果不存在則使用空物件（避免崩潰）
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, setPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // 設定 Firestore 偵錯等級，方便開發
+        setLogLevel('debug');
+
+        // --- 1. 取得環境變數與配置 ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
         
-        let auth;
-        
-        // DOM 元素參考
-        const authError = document.getElementById('auth-error');
-        const submitButton = document.getElementById('submit-button');
+        // 更新配置顯示區
+        document.getElementById('app-id-display').textContent = appId;
+        document.getElementById('project-id-display').textContent = firebaseConfig.projectId || 'N/A';
+        document.getElementById('api-key-status').textContent = firebaseConfig.apiKey ? 'Yes' : 'No';
+        if(firebaseConfig.apiKey) {
+            document.getElementById('api-key-status').classList.replace('text-red-500', 'text-green-600');
+        }
 
-        // --- Firebase 初始化與認證 ---
-        
-        try {
-            const app = initializeApp(firebaseConfig);
-            auth = getAuth(app);
-            console.log("Firebase v9 initialized successfully.");
+        // 檢查配置是否完整
+        if (Object.keys(firebaseConfig).length === 0) {
+            console.error("Firebase Configuration is missing.");
+            document.getElementById('status').textContent = '錯誤：Firebase 配置遺失！';
+            document.getElementById('status').classList.replace('bg-yellow-100', 'bg-red-100');
+            document.getElementById('status').classList.replace('text-yellow-800', 'text-red-800');
+            return;
+        }
 
-            // 1. 設定認證狀態變更監聽器 (Listener)
-            onAuthStateChanged(auth, user => {
-                if (user && !user.isAnonymous) {
-                    // 只有當用戶使用正式帳號（非匿名）登入時才重定向
-                    console.log("User is logged in and authenticated, redirecting to trips.html");
-                    // 修正：重定向到您提供的 trips.html
-                    window.location.href = 'trips.html'; 
-                } else if (user && user.isAnonymous) {
-                    console.log("User is signed in anonymously, staying on index.html for manual login.");
-                } else {
-                    console.log("No user logged in, staying on index.html.");
-                }
-            });
+
+        // --- 2. 初始化 Firebase 服務 ---
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        
+        // 設定 Auth 持久性 (Session)
+        setPersistence(auth, browserSessionPersistence);
+
+
+        // --- 3. 處理身份驗證 ---
+        onAuthStateChanged(auth, async (user) => {
+            const statusElement = document.getElementById('status');
             
-            // 2. 執行強制初始認證 (Canvas REQUIREMENT)
-            async function performInitialAuth() {
+            if (user) {
+                // 已登入：狀態更新為成功
+                const userId = user.uid;
+                statusElement.textContent = `成功連線！使用者 ID: ${userId}`;
+                statusElement.classList.remove('bg-yellow-100', 'text-yellow-800');
+                statusElement.classList.add('bg-green-100', 'text-green-800');
+                console.log("Firebase initialized and user signed in with UID:", userId);
+                
+                // 這裡可以開始執行 Firestore 相關操作
+                // 例如: await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'myCollection'));
+
+            } else {
+                // 未登入：嘗試使用自訂令牌或匿名登入
+                statusElement.textContent = '正在嘗試登入...';
+                
                 try {
+                    // 檢查環境中是否有自訂令牌，若有則使用它
                     if (initialAuthToken) {
                         await signInWithCustomToken(auth, initialAuthToken);
-                        console.log("Signed in with custom token.");
+                        // onAuthStateChanged 會再次觸發，進入上面的 if 區塊
                     } else {
-                        // 如果沒有提供 Custom Token，則匿名登入以啟動 Auth 服務
+                        // 否則使用匿名登入
                         await signInAnonymously(auth);
-                        console.log("Signed in anonymously.");
+                        // onAuthStateChanged 會再次觸發，進入上面的 if 區塊
                     }
-                } catch (e) {
-                    console.error("Initial auth failed:", e);
-                    // 初始認證失敗通常是暫時的，onAuthStateChanged 會處理後續
+                } catch (error) {
+                    // 登入失敗：狀態更新為失敗
+                    console.error("身份驗證失敗 (Auth Failed):", error);
+                    statusElement.textContent = '身份驗證失敗！請檢查配置或規則。';
+                    statusElement.classList.remove('bg-yellow-100', 'text-yellow-800');
+                    statusElement.classList.add('bg-red-100', 'text-red-800');
                 }
             }
-            performInitialAuth();
-            
-        } catch (error) {
-            console.error("Firebase 初始化失敗:", error);
-            showError(`Firebase 初始化失敗: ${error.message}`);
-        }
-
-        // --- UI 輔助函數 ---
-
-        /**
-         * 顯示錯誤訊息
-         */
-        function showError(message) {
-            authError.textContent = message;
-            authError.style.display = 'block';
-            submitButton.disabled = false;
-            submitButton.innerHTML = '<i class="fas fa-sign-in-alt mr-2"></i> 登入';
-        }
-
-        /**
-         * 處理登入操作
-         */
-        async function handleLogin() {
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-
-            // 清除之前的錯誤訊息
-            authError.style.display = 'none';
-
-            if (!email || !password) {
-                showError('請輸入電子郵件和密碼');
-                return;
-            }
-
-            // 設定載入狀態
-            submitButton.disabled = true;
-            submitButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> 登入中...';
-
-            try {
-                // 使用模組化 SDK 的登入函數
-                await signInWithEmailAndPassword(auth, email, password);
-                // 成功登入，onAuthStateChanged 會自動檢查並導向 trips.html
-                // 不需要在這裡手動重定向
-            } catch (error) {
-                console.error("登入失敗:", error);
-                let errorMessage;
-                switch (error.code) {
-                    case 'auth/user-not-found':
-                    case 'auth/wrong-password':
-                    case 'auth/invalid-credential': // v9+ 的常見錯誤碼
-                        errorMessage = '電子郵件或密碼錯誤，請重新輸入。';
-                        break;
-                    case 'auth/invalid-email':
-                        errorMessage = '電子郵件格式不正確。';
-                        break;
-                    default:
-                        errorMessage = `登入失敗: ${error.message}`;
-                }
-                showError(errorMessage);
-            }
-        }
-        window.handleLogin = handleLogin;
+        });
     </script>
 </body>
 </html>
