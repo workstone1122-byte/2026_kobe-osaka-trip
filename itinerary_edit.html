@@ -178,10 +178,9 @@
                 displayStatus('success', '新行程已成功儲存！');
             }
             
-            // --- 關鍵步驟：成功儲存後導航回清單頁 ---
-            // 這是修正您問題的關鍵。如果程式碼停在這裡，表示前面 Firebase 儲存失敗或被阻止了。
+            // --- 關鍵步驟：成功儲存後導航回清單頁 (現在是 index.html) ---
             setTimeout(() => {
-                window.location.href = 'itinerary_view.html'; 
+                window.location.href = 'index.html'; // 導航回 index.html
             }, 1000); // 延遲 1 秒，讓使用者看到成功訊息
 
         } catch (error) {
@@ -237,7 +236,7 @@
         
         // 3. 取消按鈕導航回清單頁
         document.getElementById('cancel-btn').addEventListener('click', () => {
-            window.location.href = 'itinerary_view.html';
+            window.location.href = 'index.html'; // 導航回 index.html
         });
     };
 

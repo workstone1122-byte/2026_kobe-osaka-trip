@@ -3,29 +3,203 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>正在載入行程規劃器...</title>
-    <!-- 使用 meta refresh 標籤立即跳轉到主頁面 -->
-    <meta http-equiv="refresh" content="0;url=itinerary_view.html">
+    <title>我的行程清單</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
         body {
             font-family: 'Inter', sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
             background-color: #f7f9fb;
-            text-align: center;
+        }
+        .container-card {
+            max-width: 800px;
+            margin: 2rem auto;
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .itinerary-item {
+            border-bottom: 1px solid #e2e8f0;
+            transition: background-color 0.15s;
+        }
+        .itinerary-item:last-child {
+            border-bottom: none;
+        }
+        .itinerary-item:hover {
+            background-color: #f9fafb;
         }
     </style>
 </head>
 <body>
-    <div class="p-6 bg-white rounded-lg shadow-xl">
-        <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 inline-block"></div>
-        <p class="mt-4 text-gray-700 font-medium">正在載入應用程式...</p>
-        <p class="text-sm text-gray-500 mt-1">如果沒有自動跳轉，請點擊下方連結：</p>
-        <a href="itinerary_view.html" class="text-blue-600 hover:text-blue-800 text-sm font-semibold mt-2 inline-block">前往我的行程清單</a>
+
+<div class="container-card">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold text-gray-900">我的行程</h1>
+        <button id="add-itinerary-btn" class="flex items-center px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition duration-150 shadow-md">
+            <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+            新增行程
+        </button>
     </div>
+
+    <div id="loading-spinner" class="text-center py-10">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 inline-block"></div>
+        <p class="mt-2 text-gray-500">正在載入行程資料...</p>
+    </div>
+
+    <div id="itinerary-list" class="space-y-0 border border-gray-200 rounded-lg overflow-hidden hidden">
+        <!-- 行程項目將由 JavaScript 渲染到這裡 -->
+    </div>
+    
+    <div id="empty-state" class="text-center py-10 hidden">
+        <svg class="w-12 h-12 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+        <h3 class="mt-2 text-sm font-medium text-gray-900">尚未新增任何行程</h3>
+        <p class="mt-1 text-sm text-gray-500">點擊上方按鈕開始規劃您的旅程！</p>
+    </div>
+
+</div>
+
+<!-- Firebase Modules -->
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, query, onSnapshot, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // IMPORTANT: Set debug level for firestore
+    setLogLevel('Debug');
+
+    let db;
+    let auth;
+    let userId = null;
+    let unsubscribe = null; // 用於儲存實時監聽器的取消函數
+
+    const loadingSpinner = document.getElementById('loading-spinner');
+    const itineraryList = document.getElementById('itinerary-list');
+    const emptyState = document.getElementById('empty-state');
+    
+    // --- 1. Firebase 初始化與身份驗證 ---
+    const initializeFirebase = async () => {
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
+
+        try {
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                await signInWithCustomToken(auth, __initial_auth_token);
+                console.log("Signed in with custom token.");
+            } else {
+                await signInAnonymously(auth);
+                console.log("Signed in anonymously.");
+            }
+
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    userId = user.uid;
+                    console.log("User authenticated. UID:", userId);
+                    // 身份驗證完成後，開始監聽資料
+                    startListeningToItineraries();
+                } else {
+                    console.error("Authentication failed. Cannot proceed with Firestore operations.");
+                    loadingSpinner.innerHTML = '<p class="text-red-600">載入失敗：請重新整理頁面進行身份驗證。</p>';
+                }
+            });
+
+        } catch (error) {
+            console.error("Firebase Auth Error:", error);
+            loadingSpinner.innerHTML = `<p class="text-red-600">Firebase 初始化錯誤: ${error.message}</p>`;
+        }
+    };
+    
+    // --- 2. 渲染行程清單 ---
+    const renderItineraries = (itineraries) => {
+        itineraryList.innerHTML = ''; // 清空現有清單
+        
+        if (itineraries.length === 0) {
+            itineraryList.classList.add('hidden');
+            emptyState.classList.remove('hidden');
+            loadingSpinner.classList.add('hidden'); // 確保載入指示器被隱藏
+            return;
+        }
+
+        // 隱藏載入中和空白狀態，顯示清單
+        loadingSpinner.classList.add('hidden');
+        emptyState.classList.add('hidden');
+        itineraryList.classList.remove('hidden');
+        
+        // 將行程按日期時間排序
+        itineraries.sort((a, b) => {
+            const dateA = new Date(`${a.date}T${a.time || '00:00'}`);
+            const dateB = new Date(`${b.date}T${b.time || '00:00'}`);
+            return dateA - dateB;
+        });
+
+        itineraries.forEach(item => {
+            const itemElement = document.createElement('div');
+            itemElement.className = 'itinerary-item p-4 flex justify-between items-center cursor-pointer';
+            
+            // 點擊項目時導航到編輯頁面
+            itemElement.addEventListener('click', () => {
+                // 導航到 itinerary_edit.html
+                window.location.href = `itinerary_edit.html?id=${item.id}`;
+            });
+
+            const content = `
+                <div>
+                    <p class="text-lg font-semibold text-gray-800">${item.name}</p>
+                    <p class="text-sm text-gray-500">
+                        ${item.date} 
+                        ${item.time ? ' @ ' + item.time : ''}
+                        ${item.location ? ' - ' + item.location : ''}
+                    </p>
+                    ${item.notes ? `<p class="text-xs text-gray-400 mt-1 truncate max-w-sm">${item.notes}</p>` : ''}
+                </div>
+                <!-- 編輯圖標 (僅裝飾，點擊由父層處理) -->
+                <svg class="w-5 h-5 text-blue-500 hover:text-blue-700 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+            `;
+            itemElement.innerHTML = content;
+            itineraryList.appendChild(itemElement);
+        });
+    };
+    
+    // --- 3. 實時監聽 Firestore 資料 ---
+    const startListeningToItineraries = () => {
+        if (!userId) return;
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const collectionPath = `artifacts/${appId}/users/${userId}/itineraries`;
+        const q = query(collection(db, collectionPath));
+
+        // 如果之前有監聽器，先取消它
+        if (unsubscribe) {
+            unsubscribe();
+        }
+
+        // onSnapshot 設置實時監聽
+        unsubscribe = onSnapshot(q, (snapshot) => {
+            const itineraries = [];
+            snapshot.forEach((doc) => {
+                itineraries.push({ id: doc.id, ...doc.data() });
+            });
+            console.log("Data snapshot received. Items:", itineraries.length);
+            renderItineraries(itineraries);
+        }, (error) => {
+            console.error("Error listening to Firestore:", error);
+            loadingSpinner.innerHTML = `<p class="text-red-600">資料庫連線錯誤: ${error.message}</p>`;
+        });
+    };
+    
+    // --- 4. 初始化事件監聽器 ---
+    const initializePageEvents = () => {
+        document.getElementById('add-itinerary-btn').addEventListener('click', () => {
+            // 導航到新增/編輯頁面
+            window.location.href = 'itinerary_edit.html';
+        });
+    };
+    
+    // 啟動應用程式
+    initializePageEvents();
+    initializeFirebase();
+</script>
 </body>
 </html>
