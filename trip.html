@@ -32,7 +32,7 @@
             margin-bottom: 1.5rem;
             border-left: 5px solid #007bff;
             overflow: hidden;
-            cursor: pointer; /* 讓卡片可以點擊開啟編輯 */
+            cursor: pointer; /* 讓卡片可以點擊開啟詳細檢視 */
         }
         .day-card:hover {
             transform: translateY(-5px);
@@ -66,6 +66,14 @@
         .delete-btn:hover {
             opacity: 1;
             background: white;
+        }
+
+        .description-content {
+            white-space: pre-wrap; /* 處理換行符號 */
+            border: 1px solid #eee;
+            padding: 1rem;
+            border-radius: 8px;
+            background-color: #fcfcfc;
         }
     </style>
 </head>
@@ -145,7 +153,8 @@
         let db;
         let auth;
         let unsubscribe = null; 
-        let currentModal; 
+        let editModalInstance; // 編輯 Modal 實例
+        let detailModalInstance; // 詳細檢視 Modal 實例
         let isEditMode = false; 
         let currentDocId = null; 
 
@@ -195,19 +204,24 @@
 
                         // 確保資料是 HTML 安全的，特別是單引號 (&#39;)，以便傳遞給 openEditModal
                         const safeLocation = (data.location || '地點未定').replace(/'/g, '&#39;');
-                        const safeDescription = (data.description || '點擊編輯詳細描述...').replace(/'/g, '&#39;');
+                        const safeDescription = (data.description || '點擊查看詳細描述...').replace(/'/g, '&#39;');
                         const safeArea = (data.area || '關西地區').replace(/'/g, '&#39;');
 
+                        // 新增：卡片點擊事件改為開啟詳細檢視 Modal
                         const cardHtml = `
                             <div class="col-12 col-md-6 col-lg-4">
-                                <div class="day-card p-4 position-relative" onclick="openEditModal('${docId}', '${safeLocation}', '${safeDescription}', '${safeArea}')">
+                                <div class="day-card p-4 position-relative" onclick="openDayDetailModal('${docId}', '${safeLocation}', '${safeDescription}', '${safeArea}')">
+                                    <!-- 刪除按鈕，點擊時阻止事件冒泡 -->
                                     <button class="delete-btn" onclick="event.stopPropagation(); deleteDay('${docId}')" title="刪除行程">
                                         <i class="fas fa-trash-alt fa-lg"></i>
                                     </button>
                                     <div class="day-marker">${dayDisplay}</div>
                                     <h5 class="mt-2 text-primary">${data.location || '地點未定'}</h5>
-                                    <p class="text-secondary">${data.description || '點擊編輯詳細描述...'}</p>
-                                    <small class="text-muted"><i class="fas fa-map-marker-alt me-1"></i> ${data.area || '關西地區'}</small>
+                                    <p class="text-secondary mb-2">${data.description.substring(0, 40) + (data.description.length > 40 ? '...' : '') || '點擊查看詳細描述...'}</p>
+                                    <small class="text-muted">
+                                        <i class="fas fa-map-marker-alt me-1"></i> ${data.area || '關西地區'}
+                                        <i class="fas fa-map me-1 ms-3 text-info"></i> (查看地圖)
+                                    </small>
                                 </div>
                             </div>
                         `;
@@ -220,7 +234,49 @@
                 });
         }
 
-        // --- CRUD 操作函數 ---
+        // --- 詳細檢視 (View) 函數 ---
+
+        /**
+         * 開啟詳細檢視行程的 Modal (新增功能)
+         */
+        function openDayDetailModal(docId, location, description, area) {
+            const detailModalTitle = document.getElementById('detail-modal-title');
+            const detailLocation = document.getElementById('detail-location');
+            const detailArea = document.getElementById('detail-area');
+            const detailDescription = document.getElementById('detail-description');
+            const mapButton = document.getElementById('map-button');
+            const editButton = document.getElementById('detail-edit-button');
+
+            // 1. 清理資料 (將 &#39; 轉換回 ')
+            const cleanedLocation = location.replace(/&#39;/g, "'");
+            const cleanedDescription = description.replace(/&#39;/g, "'");
+            const cleanedArea = area.replace(/&#39;/g, "'");
+
+            // 2. 填充 Modal 內容
+            detailModalTitle.textContent = `${docId.toUpperCase()} - ${cleanedLocation}`;
+            detailLocation.textContent = cleanedLocation;
+            detailArea.textContent = cleanedArea;
+            
+            // 使用 innerHTML 和 <br> 處理換行符號
+            detailDescription.innerHTML = cleanedDescription.replace(/\n/g, '<br>');
+
+            // 3. 地圖連結：建構 Google Maps 搜尋 URL
+            const searchQuery = `${cleanedLocation}, ${cleanedArea}`;
+            const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(searchQuery)}`;
+            mapButton.href = mapUrl;
+
+            // 4. 設定編輯按鈕，將數據傳遞給 openEditModal
+            editButton.onclick = () => {
+                detailModalInstance.hide(); // 關閉檢視 Modal
+                openEditModal(docId, cleanedLocation, cleanedDescription, cleanedArea); // 開啟編輯 Modal
+            };
+
+            // 5. 顯示 Modal
+            detailModalInstance.show();
+        }
+        window.openDayDetailModal = openDayDetailModal;
+        
+        // --- CRUD (Edit/Add/Delete) 操作函數 ---
 
         /**
          * 開啟新增或編輯行程的 Modal
@@ -248,7 +304,7 @@
                     dayNumInput.disabled = true; // 編輯時不允許修改 Day 數字
                 }
                 
-                // 填充現有資料 (將 &#39; 轉換回 ' 以便編輯)
+                // 填充現有資料
                 document.getElementById('location-input').value = location.replace(/&#39;/g, "'");
                 document.getElementById('description-input').value = description.replace(/&#39;/g, "'");
                 document.getElementById('area-input').value = area.replace(/&#39;/g, "'");
@@ -259,7 +315,7 @@
                 dayNumInput.disabled = false;
             }
             
-            currentModal.show();
+            editModalInstance.show();
         }
         window.openEditModal = openEditModal; 
 
@@ -305,7 +361,7 @@
                 // 使用 set() 並設定 merge: true，以便只更新提供的欄位，並創建新文件
                 await db.collection("itinerary").doc(finalDocId).set(newDayData, { merge: true });
 
-                currentModal.hide();
+                editModalInstance.hide();
                 itineraryStatus.innerHTML = `<div class="alert alert-success alert-dismissible fade show text-center" role="alert">行程 **${finalDocId}** ${isEditMode ? '更新' : '新增'}成功！
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>`;
@@ -371,12 +427,13 @@
 
         // 初始化 Modal 實例
         document.addEventListener('DOMContentLoaded', () => {
-            // 由於 Bootstrap Modal 需要實例化
-            currentModal = new bootstrap.Modal(document.getElementById('add-day-modal'));
+            // 初始化兩個 Modal 實例
+            editModalInstance = new bootstrap.Modal(document.getElementById('add-day-modal'));
+            detailModalInstance = new bootstrap.Modal(document.getElementById('day-detail-modal'));
 
-            // 確保每次 Modal 關閉時清除編輯狀態和錯誤訊息
-            const modalElement = document.getElementById('add-day-modal');
-            modalElement.addEventListener('hidden.bs.modal', function () {
+            // 確保每次編輯 Modal 關閉時清除編輯狀態和錯誤訊息
+            const editModalElement = document.getElementById('add-day-modal');
+            editModalElement.addEventListener('hidden.bs.modal', function () {
                 document.getElementById('modal-error').style.display = 'none';
                 document.getElementById('day-num-input').disabled = false;
                 isEditMode = false;
@@ -406,8 +463,8 @@
                             <input type="text" class="form-control" id="location-input" placeholder="例如: 環球影城">
                         </div>
                         <div class="mb-3">
-                            <label for="description-input" class="form-label">詳細描述</label>
-                            <textarea class="form-control" id="description-input" rows="3" placeholder="例如: 早上搭車，中午玩哈利波特區..."></textarea>
+                            <label for="description-input" class="form-label">詳細描述 / 注意事項</label>
+                            <textarea class="form-control" id="description-input" rows="5" placeholder="例如: 早上搭車，中午玩哈利波特區，晚餐吃居酒屋。&#10;&#10;注意事項：記得買快速通關！"></textarea>
                         </div>
                         <div class="mb-3">
                             <label for="area-input" class="form-label">區域 (城市)</label>
@@ -418,6 +475,42 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
                     <button type="button" class="btn btn-primary" id="submit-day-button" onclick="submitDayForm()">新增行程</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 行程詳細檢視 Modal (新的) -->
+    <div class="modal fade" id="day-detail-modal" tabindex="-1" aria-labelledby="detail-modal-title" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="detail-modal-title">行程詳細資訊</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <dl class="row">
+                        <dt class="col-sm-3"><i class="fas fa-map-pin me-2 text-primary"></i> 地點名稱</dt>
+                        <dd class="col-sm-9"><h4 id="detail-location"></h4></dd>
+
+                        <dt class="col-sm-3"><i class="fas fa-city me-2 text-primary"></i> 區域/城市</dt>
+                        <dd class="col-sm-9"><p id="detail-area"></p></dd>
+
+                        <dt class="col-sm-12 mt-3 mb-2"><i class="fas fa-scroll me-2 text-primary"></i> 詳細行程與注意事項</dt>
+                        <dd class="col-sm-12">
+                            <div id="detail-description" class="description-content"></div>
+                        </dd>
+                    </dl>
+                </div>
+                <div class="modal-footer d-flex justify-content-between">
+                    <button type="button" class="btn btn-warning" id="detail-edit-button">
+                        <i class="fas fa-edit me-1"></i> 編輯此行程
+                    </button>
+                    <!-- 地圖改善：直接連結 Google Maps 搜尋 -->
+                    <a href="#" id="map-button" class="btn btn-info text-white" target="_blank" rel="noopener noreferrer">
+                        <i class="fas fa-globe me-1"></i> 導航/查看地圖 (Google Maps)
+                    </a>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">關閉</button>
                 </div>
             </div>
         </div>
