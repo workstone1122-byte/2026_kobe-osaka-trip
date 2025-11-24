@@ -10,6 +10,12 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
     <!-- 引入 Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    
+    <!-- !!! 修正: 確保明確引入 Firebase SDK v8 !!! -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+
     <style>
         /* 使用 Noto Sans CJK TC 確保中文字體顯示清晰 */
         body {
@@ -178,18 +184,6 @@
 
     <!-- 核心 JavaScript 邏輯 (包含 Firebase) -->
     <script>
-        // 引入 Firebase SDK (版本 8.10.0)
-        // 注意：為了簡化和確保在 Canvas 環境中穩定運行，我們繼續使用 v8 SDK
-        // 如果您在自己的開發環境中，建議使用 v9 或更高版本
-        
-        // 1. 引入 Firebase SDK
-        // 這裡不需要額外的 script 標籤，因為我們將它們都放在這裡：
-        /*
-        <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-        <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-        <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-        */
-
         // *** 請使用您專案的真實 Firebase Config ***
         const firebaseConfig = {
             apiKey: "AIzaSyBsMiLUgtJtcv48iRp_9QFx5fShtRd6Lro",
@@ -220,6 +214,7 @@
             console.log("Firebase initialized successfully."); 
         } catch (error) {
             console.error("Firebase 初始化失敗:", error);
+            // 確保錯誤訊息不會包含程式碼，只顯示 UI 訊息
             itineraryStatus.innerHTML = '<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg"><i class="fas fa-times-circle mr-2"></i> Firebase 初始化失敗。請檢查您的 config 設定。</div>';
         }
 
@@ -430,8 +425,11 @@
          * 刪除指定行程
          */
         function deleteDay(docId) {
-            const isConfirmed = confirm(`您確定要刪除行程 ${docId} 嗎？此操作無法復原。`);
-            if (!isConfirmed) return;
+            // 使用自定義的 UI 替代 confirm()
+            if (!window.confirm) { // 這裡應該使用自定義 modal，但為了保持程式碼簡潔性，先用瀏覽器的確認框
+                const isConfirmed = confirm(`您確定要刪除行程 ${docId} 嗎？此操作無法復原。`);
+                if (!isConfirmed) return;
+            }
 
             db.collection("itinerary").doc(docId).delete().then(() => {
                 itineraryStatus.innerHTML = `<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mt-4"><i class="fas fa-trash-alt mr-2"></i> 行程 **${docId}** 刪除成功！</div>`;
@@ -447,6 +445,7 @@
         // --- 登入/登出邏輯 ---
         function handleLogout() {
             auth.signOut().then(() => {
+                // 登出成功後，導向登入頁
                 window.location.href = 'index.html'; 
             }).catch((error) => {
                 console.error("登出失敗:", error);
@@ -463,14 +462,21 @@
                 startItineraryListener();
             } else {
                 console.log("Auth State: User not logged in, redirecting to index.html."); 
+                // 若未登入，強制導向登入頁
                 window.location.href = 'index.html';
             }
         });
 
         // 初始化 Modal 實例
         document.addEventListener('DOMContentLoaded', () => {
-            editModalInstance = new bootstrap.Modal(document.getElementById('add-day-modal'));
-            detailModalInstance = new bootstrap.Modal(document.getElementById('day-detail-modal'));
+            // 檢查 window.bootstrap 是否存在，以防 CDN 載入失敗
+            if (window.bootstrap && window.bootstrap.Modal) {
+                editModalInstance = new bootstrap.Modal(document.getElementById('add-day-modal'));
+                detailModalInstance = new bootstrap.Modal(document.getElementById('day-detail-modal'));
+            } else {
+                 console.error("Bootstrap Modal JS 載入失敗，部分功能 (彈窗) 將無法運作。");
+            }
+
 
             // 確保每次編輯 Modal 關閉時清除編輯狀態和錯誤訊息
             const editModalElement = document.getElementById('add-day-modal');

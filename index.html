@@ -8,6 +8,11 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 引入 Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    
+    <!-- !!! 修正: 確保明確引入 Firebase SDK v8 !!! -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+
     <style>
         /* 使用 Noto Sans CJK TC 確保中文字體顯示清晰 */
         body {
@@ -40,7 +45,7 @@
                 <i class="fas fa-route text-white text-3xl"></i>
             </div>
             <h1 class="text-3xl font-extrabold text-gray-800 mt-3">神戶大阪之旅</h1>
-            <p class="text-gray-500 text-sm">行程共享與規劃 - 僅限登入</p>
+            <p class="text-gray-500 text-sm">行程共享與規劃</p>
         </header>
 
         <!-- 登入卡片 -->
@@ -81,8 +86,6 @@
                     <i class="fas fa-sign-in-alt mr-2"></i> 登入
                 </button>
             </form>
-
-             <!-- 匿名登入選項 - 已移除 -->
         </div>
         
         <p class="text-xs text-gray-400 mt-4 pb-10 sm:pb-0">請使用已註冊的帳號登入。</p>
@@ -108,7 +111,6 @@
 
         // 1. 初始化 Firebase 服務
         try {
-            // 由於 Canvas 環境限制，我們在此直接使用全局的 firebase 變數
             firebase.initializeApp(firebaseConfig);
             auth = firebase.auth();
             console.log("Firebase initialized successfully.");
@@ -117,6 +119,7 @@
             auth.onAuthStateChanged(user => {
                 if (user) {
                     console.log("User is already logged in, redirecting to trip.html");
+                    // 已登入，導向行程頁
                     window.location.href = 'trip.html';
                 } else {
                     console.log("No user logged in, staying on index.html.");
@@ -164,10 +167,8 @@
                 let errorMessage;
                 switch (error.code) {
                     case 'auth/user-not-found':
-                        errorMessage = '此電子郵件不存在。';
-                        break;
                     case 'auth/wrong-password':
-                        errorMessage = '密碼錯誤，請重新輸入。';
+                        errorMessage = '帳號或密碼錯誤，請重新確認。';
                         break;
                     case 'auth/invalid-email':
                         errorMessage = '電子郵件格式不正確。';
@@ -179,8 +180,6 @@
             }
         }
         window.handleLogin = handleLogin;
-        
-        // handleAnonymousLogin 函數已移除
     </script>
 </body>
 </html>
