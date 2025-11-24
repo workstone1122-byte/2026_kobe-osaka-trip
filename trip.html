@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>神戶大阪 5 天 4 夜 行程</title>
+    <!-- 引入 Bootstrap CSS 5.3 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
+    <!-- 引入 Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        body {
+            background-color: #f7f9fc;
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+        }
+        .travel-header {
+            background: linear-gradient(135deg, #007bff, #00c6ff);
+            color: white;
+            padding: 3rem 0;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-bottom-left-radius: 20px;
+            border-bottom-right-radius: 20px;
+        }
+        .day-card {
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            margin-bottom: 1.5rem;
+            border-left: 5px solid #007bff;
+            overflow: hidden;
+        }
+        .day-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+        }
+        .day-marker {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .loading-state {
+            text-align: center;
+            padding: 50px;
+            font-size: 1.2rem;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header 區塊 -->
+    <header class="travel-header">
+        <div class="container text-center">
+            <h1 class="display-4"><i class="fas fa-plane-departure me-2"></i> 神戶大阪 5 天 4 夜</h1>
+            <p class="lead">行程數據來自 Firebase Firestore 實時同步。</p>
+            <nav class="mt-3">
+                <a href="trip.html" class="btn btn-light btn-sm mx-1">行程總覽</a>
+                <a href="features.html" class="btn btn-outline-light btn-sm mx-1">其他功能</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- 主內容容器 -->
+    <main class="container">
+        <!-- 行程內容區塊 -->
+        <div id="itinerary-content">
+             <div class="d-flex justify-content-between align-items-center mb-4">
+                <p class="text-muted mb-0">您已成功登入，行程數據正在實時同步...</p>
+                <button class="btn btn-sm btn-outline-secondary" onclick="handleLogout()">
+                    <i class="fas fa-sign-out-alt me-1"></i> 登出
+                </button>
+            </div>
+
+            <!-- 讀取狀態或錯誤訊息會顯示在此 -->
+            <div id="itinerary-status" class="loading-state">
+                <i class="fas fa-spinner fa-spin me-2"></i> 正在檢查登入狀態...
+            </div>
+            
+            <!-- 行程卡片將被 JavaScript 插入此處 -->
+            <div id="itinerary-list" class="row">
+                <!-- Data will be populated here -->
+            </div>
+        </div>
+    </main>
+
+    <!-- 底部資訊 (可選) -->
+    <footer class="text-center text-muted py-4 mt-5 border-top">
+        <p><i class="fas fa-database me-1"></i> Data powered by Firebase Firestore.</p>
+    </footer>
+
+    <!-- 1. 引入 Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+
+    <script>
+        // *** 請使用您專案的真實 Firebase Config ***
+        const firebaseConfig = {
+            apiKey: "AIzaSyBsMiLUgtJtcv48iRp_9QFx5fShtRd6Lro",
+            authDomain: "kobe-osaka-2026travel.firebaseapp.com",
+            projectId: "kobe-osaka-2026travel",
+            storageBucket: "kobe-osaka-2026travel.firebasestorage.app",
+            messagingSenderId: "772246724994",
+            appId: "1:772246724994:web:26c067ae1096d13ebdef9b"
+        };
+
+        // DOM 元素參考
+        const itineraryList = document.getElementById('itinerary-list');
+        const itineraryStatus = document.getElementById('itinerary-status');
+        
+        let db;
+        let auth;
+        let unsubscribe = null; // 用來儲存 onSnapshot 的取消函數
+
+        // 1. 初始化 Firebase 服務
+        try {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            auth = firebase.auth();
+        } catch (error) {
+            console.error("Firebase 初始化失敗:", error);
+            itineraryStatus.innerHTML = '<div class="alert alert-danger text-center" role="alert">Firebase 初始化失敗。請檢查設定。</div>';
+        }
+
+        /**
+         * 處理行程資料的實時監聽與渲染
+         */
+        function startItineraryListener() {
+            // 清除之前的監聽器
+            if (unsubscribe) {
+                unsubscribe();
+            }
+
+            itineraryStatus.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> 正在從 Firestore 載入行程...';
+            itineraryList.innerHTML = '';
+
+            // 實時監聽 'itinerary' 集合，並依文件 ID 排序
+            unsubscribe = db.collection("itinerary").orderBy(firebase.firestore.FieldPath.documentId(), "asc")
+                .onSnapshot((querySnapshot) => {
+                    itineraryList.innerHTML = ''; 
+                    itineraryStatus.innerHTML = '';
+                    
+                    if (querySnapshot.empty) {
+                        itineraryStatus.innerHTML = '<div class="alert alert-warning text-center" role="alert"><i class="fas fa-exclamation-triangle me-2"></i> 資料庫中沒有找到行程資料 (itinerary 集合)。</div>';
+                        return;
+                    }
+
+                    // 遍歷所有文件並生成 HTML
+                    querySnapshot.forEach((doc) => {
+                        const data = doc.data();
+                        
+                        const dayMatch = doc.id.match(/Day(\d+)/i);
+                        const dayDisplay = dayMatch ? `DAY ${dayMatch[1]}` : doc.id.toUpperCase();
+
+                        const cardHtml = `
+                            <div class="col-12 col-md-6 col-lg-4">
+                                <div class="day-card p-4">
+                                    <div class="day-marker">${dayDisplay}</div>
+                                    <h5 class="mt-2 text-primary">${data.location || '地點未定'}</h5>
+                                    <p class="text-secondary">${data.description || '點擊文件來新增詳細描述...'}</p>
+                                    <small class="text-muted"><i class="fas fa-map-marker-alt me-1"></i> ${data.area || '關西地區'}</small>
+                                </div>
+                            </div>
+                        `;
+                        itineraryList.innerHTML += cardHtml;
+                    });
+
+                }, (error) => {
+                    console.error("實時監聽資料失敗: ", error);
+                    itineraryStatus.innerHTML = '<div class="alert alert-danger text-center" role="alert"><i class="fas fa-exclamation-circle me-2"></i> 資料讀取失敗：權限不足或連線錯誤。</div>';
+                });
+        }
+
+        /**
+         * 處理登出邏輯
+         */
+        function handleLogout() {
+            auth.signOut().then(() => {
+                // 登出成功，跳轉回登入頁面
+                window.location.href = 'index.html'; 
+            }).catch((error) => {
+                console.error("登出失敗:", error);
+            });
+        }
+        window.handleLogout = handleLogout;
+
+
+        // 3. 監聽 Firebase 身份驗證狀態變化
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                // 使用者已登入：啟動 Firestore 實時監聽
+                startItineraryListener();
+            } else {
+                // 使用者未登入：強制跳轉回登入頁面
+                window.location.href = 'index.html';
+            }
+        });
+    </script>
+</body>
+</html>
