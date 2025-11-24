@@ -3,183 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>登入 | 神戶大阪行程規劃</title>
-    <!-- 引入 Tailwind CSS (用於全部造型和響應式設計) -->
+    <title>正在載入行程規劃器...</title>
+    <!-- 使用 meta refresh 標籤立即跳轉到主頁面 -->
+    <meta http-equiv="refresh" content="0;url=itinerary_view.html">
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入 Font Awesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
-    
-    <!-- !!! 修正: 確保明確引入 Firebase SDK v8 !!! -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-
     <style>
-        /* 使用 Noto Sans CJK TC 確保中文字體顯示清晰 */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
         body {
-            font-family: "Noto Sans CJK TC", "Inter", sans-serif;
-            min-height: 100vh;
-            background-color: #f7f9fb; /* 淺灰色背景 */
+            font-family: 'Inter', sans-serif;
             display: flex;
             justify-content: center;
             align-items: center;
-        }
-        /* 模擬日本風格的藍色主題 */
-        .kobe-osaka-blue {
-            background: linear-gradient(145deg, #1e40af 0%, #3b82f6 100%); /* 深藍到淺藍漸變 */
-        }
-        /* 確保全螢幕高度，尤其在行動裝置上 */
-        .full-screen-container {
-            /* 移除 min-height: 100vh; 以避免鍵盤彈出時產生布局問題，讓內容自然滾動 */
-            padding: 1rem; 
-            width: 100%; /* 確保在任何螢幕上都能佔滿寬度 */
+            height: 100vh;
+            background-color: #f7f9fb;
+            text-align: center;
         }
     </style>
 </head>
 <body>
-
-    <div class="full-screen-container w-full max-w-md mx-auto flex flex-col justify-center items-center">
-
-        <!-- App 標題區 -->
-        <header class="text-center mb-8 pt-10 sm:pt-0">
-            <div class="kobe-osaka-blue p-3 rounded-full inline-block shadow-lg">
-                <i class="fas fa-route text-white text-3xl"></i>
-            </div>
-            <h1 class="text-3xl font-extrabold text-gray-800 mt-3">神戶大阪之旅</h1>
-            <p class="text-gray-500 text-sm">行程共享與規劃</p>
-        </header>
-
-        <!-- 登入卡片 -->
-        <div class="w-full bg-white rounded-2xl shadow-2xl p-6 sm:p-8 border border-gray-100">
-            
-            <h3 class="text-2xl font-bold text-gray-700 text-center mb-6 border-b pb-4">帳號登入</h3>
-            
-            <!-- 錯誤訊息顯示區 -->
-            <div id="auth-error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-4" style="display: none;">
-                <!-- 錯誤訊息將顯示在這裡 -->
-            </div>
-            
-            <!-- 表單區 -->
-            <form id="auth-form" onsubmit="event.preventDefault(); handleLogin()">
-                <div class="space-y-5">
-                    
-                    <!-- Email 輸入 -->
-                    <div>
-                        <label for="email" class="block text-sm font-medium text-gray-700 mb-1">電子郵件</label>
-                        <div class="relative">
-                            <i class="fas fa-envelope absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                            <input type="email" id="email" class="w-full p-3 pl-10 border border-gray-300 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 transition" required placeholder="name@example.com">
-                        </div>
-                    </div>
-
-                    <!-- 密碼輸入 -->
-                    <div>
-                        <label for="password" class="block text-sm font-medium text-gray-700 mb-1">密碼</label>
-                        <div class="relative">
-                            <i class="fas fa-lock absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                            <input type="password" id="password" class="w-full p-3 pl-10 border border-gray-300 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 transition" required placeholder="請輸入密碼">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 提交按鈕 -->
-                <button type="submit" id="submit-button" class="mt-8 w-full kobe-osaka-blue text-white p-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition duration-300 active:scale-98">
-                    <i class="fas fa-sign-in-alt mr-2"></i> 登入
-                </button>
-            </form>
-        </div>
-        
-        <p class="text-xs text-gray-400 mt-4 pb-10 sm:pb-0">請使用已註冊的帳號登入。</p>
+    <div class="p-6 bg-white rounded-lg shadow-xl">
+        <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 inline-block"></div>
+        <p class="mt-4 text-gray-700 font-medium">正在載入應用程式...</p>
+        <p class="text-sm text-gray-500 mt-1">如果沒有自動跳轉，請點擊下方連結：</p>
+        <a href="itinerary_view.html" class="text-blue-600 hover:text-blue-800 text-sm font-semibold mt-2 inline-block">前往我的行程清單</a>
     </div>
-
-    <!-- 核心 JavaScript 邏輯 (包含 Firebase) -->
-    <script>
-        // *** 請使用您專案的真實 Firebase Config ***
-        const firebaseConfig = {
-            apiKey: "AIzaSyBsMiLUgtJtcv48iRp_9QFx5fShtRd6Lro",
-            authDomain: "kobe-osaka-2026travel.firebaseapp.com",
-            projectId: "kobe-osaka-2026travel",
-            storageBucket: "kobe-osaka-2026travel.firebasestorage.app",
-            messagingSenderId: "772246724994",
-            appId: "1:772246724994:web:26c067ae1096d13ebdef9b"
-        };
-        
-        let auth;
-        
-        // DOM 元素參考
-        const authError = document.getElementById('auth-error');
-        const submitButton = document.getElementById('submit-button');
-
-        // 1. 初始化 Firebase 服務
-        try {
-            firebase.initializeApp(firebaseConfig);
-            auth = firebase.auth();
-            console.log("Firebase initialized successfully.");
-
-            // 檢查是否已登入
-            auth.onAuthStateChanged(user => {
-                if (user) {
-                    console.log("User is already logged in, redirecting to trip.html");
-                    // 已登入，導向行程頁
-                    window.location.href = 'trip.html';
-                } else {
-                    console.log("No user logged in, staying on index.html.");
-                }
-            });
-            
-        } catch (error) {
-            console.error("Firebase 初始化失敗:", error);
-            showError(`Firebase 初始化失敗: ${error.message}`);
-        }
-
-        // --- UI 輔助函數 ---
-
-        /**
-         * 顯示錯誤訊息
-         */
-        function showError(message) {
-            authError.textContent = message;
-            authError.style.display = 'block';
-            submitButton.disabled = false;
-            submitButton.innerHTML = '<i class="fas fa-sign-in-alt mr-2"></i> 登入';
-        }
-
-        /**
-         * 處理登入操作
-         */
-        async function handleLogin() {
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-
-            if (!email || !password) {
-                showError('請輸入電子郵件和密碼');
-                return;
-            }
-
-            // 設定載入狀態
-            submitButton.disabled = true;
-            submitButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> 登入中...';
-
-            try {
-                await auth.signInWithEmailAndPassword(email, password);
-                // 成功登入，onAuthStateChanged 會自動導向 trip.html
-            } catch (error) {
-                console.error("登入失敗:", error);
-                let errorMessage;
-                switch (error.code) {
-                    case 'auth/user-not-found':
-                    case 'auth/wrong-password':
-                        errorMessage = '帳號或密碼錯誤，請重新確認。';
-                        break;
-                    case 'auth/invalid-email':
-                        errorMessage = '電子郵件格式不正確。';
-                        break;
-                    default:
-                        errorMessage = `登入失敗: ${error.message}`;
-                }
-                showError(errorMessage);
-            }
-        }
-        window.handleLogin = handleLogin;
-    </script>
 </body>
 </html>
