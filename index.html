@@ -20,7 +20,7 @@
 <body class="p-4 sm:p-8 min-h-screen flex items-start justify-center">
 
     <div class="container w-full bg-white shadow-xl rounded-xl p-6 md:p-10">
-        <h1 class="text-3xl font-bold text-gray-800 mb-6 border-b pb-2">Firebase 服務初始化</h1>
+        <h1 class="text-3xl font-bold text-gray-800 mb-6 border-b pb-2">Firebase 服務初始化與錯誤檢查</h1>
 
         <div id="status" class="w-full text-center p-4 rounded-lg font-medium text-lg 
                                   bg-yellow-100 text-yellow-800 transition duration-300">
@@ -28,14 +28,15 @@
         </div>
 
         <div class="mt-8">
-            <h2 class="text-xl font-semibold text-gray-700 mb-3">Firebase 配置詳細資訊</h2>
+            <h2 class="text-xl font-semibold text-gray-700 mb-3">當前配置詳細資訊（由環境注入）</h2>
             
             <div id="config-display" class="bg-gray-50 p-4 rounded-lg text-sm break-all">
-                <p><span class="font-medium text-gray-600">App ID:</span> <span id="app-id-display">N/A</span></p>
-                <p><span class="font-medium text-gray-600">Project ID:</span> <span id="project-id-display">N/A</span></p>
-                <p><span class="font-medium text-gray-600">API Key Exists:</span> <span id="api-key-status" class="font-semibold text-red-500">No</span></p>
-                <p class="mt-3"><span class="font-medium text-gray-600">Firestore Path Example (Public):</span> <code>/artifacts/&lt;appId&gt;/public/data/items</code></p>
-                <p><span class="font-medium text-gray-600">Firestore Path Example (Private):</span> <code>/artifacts/&lt;appId&gt;/users/&lt;userId&gt;/data/items</code></p>
+                <p class="mb-2"><span class="font-medium text-gray-600">App ID:</span> <span id="app-id-display">N/A</span></p>
+                <p class="mb-2"><span class="font-medium text-gray-600">Project ID:</span> <span id="project-id-display">N/A</span></p>
+                <p class="mb-2"><span class="font-medium text-gray-600">API Key:</span> <code id="api-key-display" class="text-red-600 font-mono">N/A</code></p>
+                <p class="mt-4 text-xs text-gray-500">
+                    若發生 (auth/invalid-api-key) 錯誤，請檢查上方顯示的 API Key 是否與您的 Firebase 專案設定一致。
+                </p>
             </div>
         </div>
     </div>
@@ -46,10 +47,10 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, setPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // 設定 Firestore 偵錯等級，方便開發
+        // 設定 Firestore 偵錯等級
         setLogLevel('debug');
 
-        // --- 1. 取得環境變數與配置 ---
+        // --- 1. 取得環境變數與配置 (從環境中安全載入) ---
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
@@ -57,15 +58,16 @@
         // 更新配置顯示區
         document.getElementById('app-id-display').textContent = appId;
         document.getElementById('project-id-display').textContent = firebaseConfig.projectId || 'N/A';
-        document.getElementById('api-key-status').textContent = firebaseConfig.apiKey ? 'Yes' : 'No';
-        if(firebaseConfig.apiKey) {
-            document.getElementById('api-key-status').classList.replace('text-red-500', 'text-green-600');
+        const apiKeyDisplay = document.getElementById('api-key-display');
+        apiKeyDisplay.textContent = firebaseConfig.apiKey || '金鑰遺失';
+        if (firebaseConfig.apiKey) {
+            apiKeyDisplay.classList.replace('text-red-600', 'text-green-600');
         }
 
         // 檢查配置是否完整
-        if (Object.keys(firebaseConfig).length === 0) {
-            console.error("Firebase Configuration is missing.");
-            document.getElementById('status').textContent = '錯誤：Firebase 配置遺失！';
+        if (!firebaseConfig.apiKey || Object.keys(firebaseConfig).length === 0) {
+            console.error("Firebase Configuration is incomplete or missing API Key.");
+            document.getElementById('status').textContent = '錯誤：Firebase 配置遺失或 API Key 不完整！';
             document.getElementById('status').classList.replace('bg-yellow-100', 'bg-red-100');
             document.getElementById('status').classList.replace('text-yellow-800', 'text-red-800');
             return;
@@ -89,32 +91,32 @@
                 // 已登入：狀態更新為成功
                 const userId = user.uid;
                 statusElement.textContent = `成功連線！使用者 ID: ${userId}`;
-                statusElement.classList.remove('bg-yellow-100', 'text-yellow-800');
+                statusElement.classList.remove('bg-yellow-100', 'text-yellow-800', 'bg-red-100', 'text-red-800');
                 statusElement.classList.add('bg-green-100', 'text-green-800');
                 console.log("Firebase initialized and user signed in with UID:", userId);
                 
                 // 這裡可以開始執行 Firestore 相關操作
-                // 例如: await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'myCollection'));
+                // 例如: const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'myCollection'));
 
             } else {
                 // 未登入：嘗試使用自訂令牌或匿名登入
-                statusElement.textContent = '正在嘗試登入...';
+                statusElement.textContent = '使用者未登入，正在嘗試身份驗證...';
                 
                 try {
                     // 檢查環境中是否有自訂令牌，若有則使用它
                     if (initialAuthToken) {
                         await signInWithCustomToken(auth, initialAuthToken);
-                        // onAuthStateChanged 會再次觸發，進入上面的 if 區塊
+                        // onAuthStateChanged 會再次觸發
                     } else {
                         // 否則使用匿名登入
                         await signInAnonymously(auth);
-                        // onAuthStateChanged 會再次觸發，進入上面的 if 區塊
+                        // onAuthStateChanged 會再次觸發
                     }
                 } catch (error) {
                     // 登入失敗：狀態更新為失敗
                     console.error("身份驗證失敗 (Auth Failed):", error);
-                    statusElement.textContent = '身份驗證失敗！請檢查配置或規則。';
-                    statusElement.classList.remove('bg-yellow-100', 'text-yellow-800');
+                    statusElement.textContent = `身份驗證失敗！錯誤代碼: ${error.code}`;
+                    statusElement.classList.remove('bg-yellow-100', 'text-yellow-800', 'bg-green-100', 'text-green-800');
                     statusElement.classList.add('bg-red-100', 'text-red-800');
                 }
             }
