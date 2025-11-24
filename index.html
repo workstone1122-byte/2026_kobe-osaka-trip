@@ -3,70 +3,104 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>登入 - 神戶大阪 5 天 4 夜</title>
-    <!-- 引入 Bootstrap CSS 5.3 -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
+    <title>登入 | 神戶大阪行程規劃</title>
+    <!-- 引入 Tailwind CSS (用於全部造型和響應式設計) -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <!-- 引入 Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
+        /* 使用 Noto Sans CJK TC 確保中文字體顯示清晰 */
         body {
-            background-color: #f7f9fc;
-            font-family: 'Inter', sans-serif;
+            font-family: "Noto Sans CJK TC", "Inter", sans-serif;
             min-height: 100vh;
+            background-color: #f7f9fb; /* 淺灰色背景 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
-        .travel-header {
-            background: linear-gradient(135deg, #007bff, #00c6ff);
-            color: white;
-            padding: 3rem 0;
-            margin-bottom: 2rem;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        /* 模擬日本風格的藍色主題 */
+        .kobe-osaka-blue {
+            background: linear-gradient(145deg, #1e40af 0%, #3b82f6 100%); /* 深藍到淺藍漸變 */
         }
-        .login-container {
-            max-width: 400px;
-            margin: 5rem auto;
-            padding: 2rem;
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        /* 確保全螢幕高度，尤其在行動裝置上 */
+        .full-screen-container {
+            min-height: 100vh;
+            padding: 1rem; /* 確保邊緣有間距 */
         }
     </style>
 </head>
 <body>
 
-    <!-- Header 區塊 -->
-    <header class="travel-header">
-        <div class="container text-center">
-            <h1 class="display-4"><i class="fas fa-plane-departure me-2"></i> 神戶大阪 5 天 4 夜</h1>
-            <p class="lead">精彩關西之旅，請登入存取。</p>
-        </div>
-    </header>
+    <div class="full-screen-container w-full max-w-md mx-auto flex flex-col justify-center items-center">
 
-    <!-- 登入表單 -->
-    <main class="container">
-        <div id="login-screen" class="login-container text-center">
-            <h4 class="mb-4 text-primary">行程登入</h4>
-            <div id="login-error" class="alert alert-danger" style="display: none;"></div>
-            
-            <div class="form-floating mb-3">
-                <input type="email" class="form-control rounded-lg" id="email-input" placeholder="name@example.com">
-                <label for="email-input">電子郵件</label>
+        <!-- App 標題區 -->
+        <header class="text-center mb-8">
+            <div class="kobe-osaka-blue p-3 rounded-full inline-block shadow-lg">
+                <i class="fas fa-route text-white text-3xl"></i>
             </div>
-            <div class="form-floating mb-4">
-                <input type="password" class="form-control rounded-lg" id="password-input" placeholder="密碼">
-                <label for="password-input">密碼</label>
+            <h1 class="text-3xl font-extrabold text-gray-800 mt-3">神戶大阪之旅</h1>
+            <p class="text-gray-500 text-sm">行程共享與規劃</p>
+        </header>
+
+        <!-- 登入/註冊卡片 -->
+        <div class="w-full bg-white rounded-2xl shadow-2xl p-6 sm:p-8 border border-gray-100">
+            
+            <!-- Tab 切換區 -->
+            <div class="flex mb-6 border-b border-gray-200">
+                <button id="login-tab" class="flex-1 py-3 text-lg font-semibold text-center border-b-2 transition duration-300" 
+                        onclick="toggleForm(false)">
+                    登入
+                </button>
+                <button id="register-tab" class="flex-1 py-3 text-lg font-semibold text-center border-b-2 transition duration-300" 
+                        onclick="toggleForm(true)">
+                    註冊新帳號
+                </button>
             </div>
             
-            <button id="login-button" class="btn btn-primary w-100 py-2 rounded-lg" onclick="handleLogin()">
-                <i class="fas fa-sign-in-alt me-2"></i> 登入行程
+            <!-- 錯誤訊息顯示區 -->
+            <div id="auth-error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-4" style="display: none;">
+                <!-- 錯誤訊息將顯示在這裡 -->
+            </div>
+            
+            <!-- 表單區 -->
+            <form id="auth-form" onsubmit="event.preventDefault(); isRegister ? handleRegister() : handleLogin()">
+                <div class="space-y-5">
+                    
+                    <!-- Email 輸入 -->
+                    <div>
+                        <label for="email" class="block text-sm font-medium text-gray-700 mb-1">電子郵件</label>
+                        <div class="relative">
+                            <i class="fas fa-envelope absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                            <input type="email" id="email" class="w-full p-3 pl-10 border border-gray-300 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 transition" required placeholder="name@example.com">
+                        </div>
+                    </div>
+
+                    <!-- 密碼輸入 -->
+                    <div>
+                        <label for="password" class="block text-sm font-medium text-gray-700 mb-1">密碼</label>
+                        <div class="relative">
+                            <i class="fas fa-lock absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                            <input type="password" id="password" class="w-full p-3 pl-10 border border-gray-300 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 transition" required minlength="6" placeholder="最少 6 個字元">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 提交按鈕 -->
+                <button type="submit" id="submit-button" class="mt-8 w-full kobe-osaka-blue text-white p-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition duration-300 active:scale-98">
+                    <i class="fas fa-sign-in-alt mr-2"></i> 登入
+                </button>
+            </form>
+
+             <!-- 匿名登入選項 -->
+            <button onclick="handleAnonymousLogin()" class="mt-4 w-full bg-gray-100 text-gray-700 p-3 rounded-xl font-semibold border border-gray-300 hover:bg-gray-200 transition duration-300 active:scale-98">
+                <i class="fas fa-user-secret mr-2"></i> 匿名體驗 (不儲存資料)
             </button>
-            <small class="text-muted mt-3 d-block">請使用 Firebase Authentication 中已授權的帳號。</small>
         </div>
-    </main>
+        
+        <p class="text-xs text-gray-400 mt-4">首次使用請先註冊。</p>
+    </div>
 
-    <!-- 1. 引入 Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-    
+    <!-- 核心 JavaScript 邏輯 (包含 Firebase) -->
     <script>
         // *** 請使用您專案的真實 Firebase Config ***
         const firebaseConfig = {
@@ -77,51 +111,173 @@
             messagingSenderId: "772246724994",
             appId: "1:772246724994:web:26c067ae1096d13ebdef9b"
         };
-
-        const loginErrorDiv = document.getElementById('login-error');
+        
         let auth;
+        let isRegister = false;
+        
+        // DOM 元素參考
+        const authError = document.getElementById('auth-error');
+        const submitButton = document.getElementById('submit-button');
+        const loginTab = document.getElementById('login-tab');
+        const registerTab = document.getElementById('register-tab');
 
-        // 初始化 Firebase 服務
+        // 1. 初始化 Firebase 服務
         try {
+            // 由於 Canvas 環境限制，我們在此直接使用全局的 firebase 變數
             firebase.initializeApp(firebaseConfig);
             auth = firebase.auth();
+            console.log("Firebase initialized successfully.");
+
+            // 檢查是否已登入
+            auth.onAuthStateChanged(user => {
+                if (user) {
+                    console.log("User is already logged in, redirecting to trip.html");
+                    window.location.href = 'trip.html';
+                } else {
+                    console.log("No user logged in, staying on index.html.");
+                    // 預設為登入模式
+                    toggleForm(false);
+                }
+            });
+            
         } catch (error) {
             console.error("Firebase 初始化失敗:", error);
-            loginErrorDiv.textContent = 'Firebase 初始化失敗。請檢查設定。';
-            loginErrorDiv.style.display = 'block';
+            showError(`Firebase 初始化失敗: ${error.message}`);
+        }
+
+        // --- UI 輔助函數 ---
+
+        /**
+         * 顯示錯誤訊息
+         */
+        function showError(message) {
+            authError.textContent = message;
+            authError.style.display = 'block';
+            submitButton.disabled = false;
+            submitButton.innerHTML = isRegister ? '<i class="fas fa-user-plus mr-2"></i> 註冊' : '<i class="fas fa-sign-in-alt mr-2"></i> 登入';
         }
 
         /**
-         * 處理登入邏輯
+         * 切換登入和註冊表單
+         */
+        function toggleForm(shouldRegister) {
+            isRegister = shouldRegister;
+            authError.style.display = 'none'; // 切換時清除錯誤
+            
+            // 樣式切換
+            if (isRegister) {
+                submitButton.innerHTML = '<i class="fas fa-user-plus mr-2"></i> 註冊';
+                loginTab.classList.remove('border-indigo-600', 'text-indigo-600');
+                registerTab.classList.add('border-indigo-600', 'text-indigo-600');
+                registerTab.classList.remove('text-gray-500');
+                loginTab.classList.add('text-gray-500');
+            } else {
+                submitButton.innerHTML = '<i class="fas fa-sign-in-alt mr-2"></i> 登入';
+                registerTab.classList.remove('border-indigo-600', 'text-indigo-600');
+                loginTab.classList.add('border-indigo-600', 'text-indigo-600');
+                loginTab.classList.remove('text-gray-500');
+                registerTab.classList.add('text-gray-500');
+            }
+        }
+        window.toggleForm = toggleForm;
+
+        /**
+         * 處理登入操作
          */
         async function handleLogin() {
-            const email = document.getElementById('email-input').value;
-            const password = document.getElementById('password-input').value;
-            const button = document.getElementById('login-button');
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
 
-            loginErrorDiv.style.display = 'none';
-            button.disabled = true;
-            button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> 登入中...';
+            if (!email || !password) {
+                showError('請輸入電子郵件和密碼');
+                return;
+            }
+
+            // 設定載入狀態
+            submitButton.disabled = true;
+            submitButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> 登入中...';
 
             try {
                 await auth.signInWithEmailAndPassword(email, password);
-                // 登入成功，直接跳轉到行程頁面
-                window.location.href = 'trip.html'; 
+                // 成功登入，onAuthStateChanged 會自動導向 trip.html
             } catch (error) {
-                console.error("登入失敗:", error.code, error.message);
-                loginErrorDiv.textContent = '登入失敗：電子郵件或密碼不正確。';
-                loginErrorDiv.style.display = 'block';
-                button.disabled = false;
-                button.innerHTML = '<i class="fas fa-sign-in-alt me-2"></i> 登入行程';
+                console.error("登入失敗:", error);
+                let errorMessage;
+                switch (error.code) {
+                    case 'auth/user-not-found':
+                        errorMessage = '此電子郵件尚未註冊。';
+                        break;
+                    case 'auth/wrong-password':
+                        errorMessage = '密碼錯誤，請重新輸入。';
+                        break;
+                    default:
+                        errorMessage = `登入失敗: ${error.message}`;
+                }
+                showError(errorMessage);
             }
         }
+        window.handleLogin = handleLogin;
 
-        // 登入狀態監聽：如果使用者已經登入，直接跳轉到行程頁面
-        auth.onAuthStateChanged((user) => {
-            if (user) {
-                window.location.href = 'trip.html';
+        /**
+         * 處理註冊操作
+         */
+        async function handleRegister() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            if (password.length < 6) {
+                showError('密碼長度必須至少為 6 個字元。');
+                return;
             }
-        });
+
+            // 設定載入狀態
+            submitButton.disabled = true;
+            submitButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> 註冊中...';
+
+            try {
+                await auth.createUserWithEmailAndPassword(email, password);
+                // 成功註冊後會自動登入，onAuthStateChanged 會自動導向 trip.html
+            } catch (error) {
+                console.error("註冊失敗:", error);
+                let errorMessage;
+                switch (error.code) {
+                    case 'auth/email-already-in-use':
+                        errorMessage = '此電子郵件已被註冊。請直接登入或使用其他信箱。';
+                        break;
+                    case 'auth/weak-password':
+                        errorMessage = '密碼太弱，請使用更強的密碼。';
+                        break;
+                    default:
+                        errorMessage = `註冊失敗: ${error.message}`;
+                }
+                showError(errorMessage);
+            }
+        }
+        window.handleRegister = handleRegister;
+
+        /**
+         * 處理匿名登入操作
+         */
+        async function handleAnonymousLogin() {
+             // 設定載入狀態 (使用匿名按鈕本身)
+            const anonButton = document.querySelector('button[onclick="handleAnonymousLogin()"]');
+            const originalText = anonButton.innerHTML;
+            anonButton.disabled = true;
+            anonButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> 體驗中...';
+
+            try {
+                await auth.signInAnonymously();
+                // 成功登入，onAuthStateChanged 會自動導向 trip.html
+            } catch (error) {
+                console.error("匿名登入失敗:", error);
+                showError(`匿名登入失敗: ${error.message}`);
+            } finally {
+                anonButton.disabled = false;
+                anonButton.innerHTML = originalText;
+            }
+        }
+        window.handleAnonymousLogin = handleAnonymousLogin;
+
     </script>
 </body>
 </html>
