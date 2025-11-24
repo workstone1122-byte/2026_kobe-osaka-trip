@@ -3,124 +3,259 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Firebase 連線與身份驗證</title>
-    <!-- 載入 Tailwind CSS -->
+    <title>Firebase 設定與驗證測試</title>
+    <!-- 載入 Tailwind CSS 框架，用於美化介面 -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 設定字體和圓角樣式 -->
     <style>
-        /* 使用 Inter 字體並確保全寬佈局 */
-        body {
+        :root {
             font-family: 'Inter', sans-serif;
-            background-color: #f7f7f7;
         }
-        .container {
-            max-width: 800px;
+        .card {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+        }
+        .success {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+        .error {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+        .loading {
+            background-color: #eff6ff;
+            color: #1e40af;
         }
     </style>
 </head>
-<body class="p-4 sm:p-8 min-h-screen flex items-start justify-center">
+<body class="bg-gray-50 flex items-center justify-center min-h-screen p-4">
+    <div id="app" class="w-full max-w-xl">
+        <h1 class="text-3xl font-extrabold text-gray-900 mb-6 text-center">
+            Firebase 啟動與測試
+        </h1>
+        <div id="status-card" class="card p-6 rounded-xl border border-gray-200">
+            <h2 class="text-xl font-semibold mb-4 text-gray-800">檢查步驟</h2>
 
-    <div class="container w-full bg-white shadow-xl rounded-xl p-6 md:p-10">
-        <h1 class="text-3xl font-bold text-gray-800 mb-6 border-b pb-2">Firebase 服務初始化與錯誤檢查</h1>
-
-        <div id="status" class="w-full text-center p-4 rounded-lg font-medium text-lg 
-                                  bg-yellow-100 text-yellow-800 transition duration-300">
-            正在初始化 Firebase 與身份驗證...
-        </div>
-
-        <div class="mt-8">
-            <h2 class="text-xl font-semibold text-gray-700 mb-3">當前配置詳細資訊（由環境注入）</h2>
+            <!-- 步驟 1: 設定與初始化 -->
+            <div id="step-init" class="p-3 mb-3 rounded-lg loading border border-blue-300">
+                <p class="font-medium">1. Firebase 初始化狀態: <span id="init-status">載入中...</span></p>
+            </div>
             
-            <div id="config-display" class="bg-gray-50 p-4 rounded-lg text-sm break-all">
-                <p class="mb-2"><span class="font-medium text-gray-600">App ID:</span> <span id="app-id-display">N/A</span></p>
-                <p class="mb-2"><span class="font-medium text-gray-600">Project ID:</span> <span id="project-id-display">N/A</span></p>
-                <p class="mb-2"><span class="font-medium text-gray-600">API Key:</span> <code id="api-key-display" class="text-red-600 font-mono">N/A</code></p>
-                <p class="mt-4 text-xs text-gray-500">
-                    若發生 (auth/invalid-api-key) 錯誤，請檢查上方顯示的 API Key 是否與您的 Firebase 專案設定一致。
-                </p>
+            <!-- 步驟 2: 身份驗證 -->
+            <div id="step-auth" class="p-3 mb-3 rounded-lg loading border border-blue-300">
+                <p class="font-medium">2. 身份驗證狀態: <span id="auth-status">等待登入...</span></p>
+            </div>
+
+            <!-- 顯示用戶 ID (對多用戶應用程式來說非常重要) -->
+            <div id="user-info" class="p-3 mb-3 rounded-lg bg-gray-100 text-gray-600 border border-gray-300 hidden">
+                <p class="text-sm font-mono break-all">用戶 ID (UID): <span id="user-id" class="font-bold text-gray-800"></span></p>
+                <p class="text-xs mt-1">此 ID 是您在資料庫中儲存私人資料的依據。</p>
+            </div>
+
+            <!-- 步驟 3: Firestore 連線測試 -->
+            <div id="step-firestore" class="p-3 rounded-lg loading border border-blue-300">
+                <p class="font-medium">3. Firestore 連線狀態: <span id="firestore-status">等待測試...</span></p>
+            </div>
+
+            <!-- 結果回饋 -->
+            <div id="result-message" class="mt-5 p-4 rounded-xl hidden">
+                <p id="result-text" class="font-bold"></p>
             </div>
         </div>
     </div>
 
     <script type="module">
-        // 匯入 Firebase 核心模組、Auth 與 Firestore 服務
+        // =======================================================================
+        // 步驟 1: 載入 Firebase 函式庫
+        // =======================================================================
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, setPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // 設定 Firestore 偵錯等級
-        setLogLevel('debug');
+        // =======================================================================
+        // 獲取 UI 元素
+        // =======================================================================
+        const initStatusEl = document.getElementById('init-status');
+        const initStepEl = document.getElementById('step-init');
+        const authStatusEl = document.getElementById('auth-status');
+        const authStepEl = document.getElementById('step-auth');
+        const firestoreStatusEl = document.getElementById('firestore-status');
+        const firestoreStepEl = document.getElementById('step-firestore');
+        const userIdEl = document.getElementById('user-id');
+        const userInfoEl = document.getElementById('user-info');
+        const resultMessageEl = document.getElementById('result-message');
+        const resultTextEl = document.getElementById('result-text');
 
-        // --- 1. 取得環境變數與配置 (從環境中安全載入) ---
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        // =======================================================================
+        // 步驟 2: 初始化 Firebase 應用程式和服務
+        // 加入您的手動配置作為備用方案 (硬編碼)
+        // =======================================================================
+        let app;
+        let auth;
+        let db;
+        let userId = 'N/A';
         
-        // 更新配置顯示區
-        document.getElementById('app-id-display').textContent = appId;
-        document.getElementById('project-id-display').textContent = firebaseConfig.projectId || 'N/A';
-        const apiKeyDisplay = document.getElementById('api-key-display');
-        apiKeyDisplay.textContent = firebaseConfig.apiKey || '金鑰遺失';
-        if (firebaseConfig.apiKey) {
-            apiKeyDisplay.classList.replace('text-red-600', 'text-green-600');
-        }
+        // --- 您的手動配置 (作為環境變數載入失敗時的備用方案) ---
+        const manualFirebaseConfig = {
+            apiKey: "AIzaSyBsMiLUgtJtcv48iRp_9QFx5fShtRd6Lro",
+            authDomain: "kobe-osaka-2026travel.firebaseapp.com",
+            projectId: "kobe-osaka-2026travel",
+            storageBucket: "kobe-osaka-2026travel.firebasestorage.app",
+            messagingSenderId: "772246724994",
+            appId: "1:772246724994:web:26c067ae1096d13ebdef9b"
+        };
+        // ----------------------------------------------------------------------
 
-        // 檢查配置是否完整
-        if (!firebaseConfig.apiKey || Object.keys(firebaseConfig).length === 0) {
-            console.error("Firebase Configuration is incomplete or missing API Key.");
-            document.getElementById('status').textContent = '錯誤：Firebase 配置遺失或 API Key 不完整！';
-            document.getElementById('status').classList.replace('bg-yellow-100', 'bg-red-100');
-            document.getElementById('status').classList.replace('text-yellow-800', 'text-red-800');
-            return;
-        }
-
-
-        // --- 2. 初始化 Firebase 服務 ---
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
-        
-        // 設定 Auth 持久性 (Session)
-        setPersistence(auth, browserSessionPersistence);
-
-
-        // --- 3. 處理身份驗證 ---
-        onAuthStateChanged(auth, async (user) => {
-            const statusElement = document.getElementById('status');
-            
-            if (user) {
-                // 已登入：狀態更新為成功
-                const userId = user.uid;
-                statusElement.textContent = `成功連線！使用者 ID: ${userId}`;
-                statusElement.classList.remove('bg-yellow-100', 'text-yellow-800', 'bg-red-100', 'text-red-800');
-                statusElement.classList.add('bg-green-100', 'text-green-800');
-                console.log("Firebase initialized and user signed in with UID:", userId);
-                
-                // 這裡可以開始執行 Firestore 相關操作
-                // 例如: const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'myCollection'));
-
-            } else {
-                // 未登入：嘗試使用自訂令牌或匿名登入
-                statusElement.textContent = '使用者未登入，正在嘗試身份驗證...';
-                
-                try {
-                    // 檢查環境中是否有自訂令牌，若有則使用它
-                    if (initialAuthToken) {
-                        await signInWithCustomToken(auth, initialAuthToken);
-                        // onAuthStateChanged 會再次觸發
-                    } else {
-                        // 否則使用匿名登入
-                        await signInAnonymously(auth);
-                        // onAuthStateChanged 會再次觸發
-                    }
-                } catch (error) {
-                    // 登入失敗：狀態更新為失敗
-                    console.error("身份驗證失敗 (Auth Failed):", error);
-                    statusElement.textContent = `身份驗證失敗！錯誤代碼: ${error.code}`;
-                    statusElement.classList.remove('bg-yellow-100', 'text-yellow-800', 'bg-green-100', 'text-green-800');
-                    statusElement.classList.add('bg-red-100', 'text-red-800');
-                }
+        try {
+            // 嘗試解析環境配置，如果失敗，則使用手動配置
+            let firebaseConfig = manualFirebaseConfig;
+            if (typeof __firebase_config !== 'undefined' && JSON.parse(__firebase_config).projectId) {
+                 firebaseConfig = JSON.parse(__firebase_config);
             }
-        });
+            
+            if (Object.keys(firebaseConfig).length === 0 || !firebaseConfig.projectId) {
+                throw new Error("無法找到有效的 Firebase 設定，請確認專案已連結。");
+            }
+
+            // 確定 appId。如果環境變數有值，則優先使用環境變數。
+            const appId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.appId || 'default-app-id';
+
+
+            // 初始化 Firebase App
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+
+            initStatusEl.textContent = '成功！應用程式與服務已初始化。';
+            initStepEl.classList.remove('loading');
+            initStepEl.classList.add('success');
+
+            // 進行身份驗證
+            initAuthAndTestConnection(appId);
+
+        } catch (error) {
+            console.error("Firebase 初始化失敗:", error);
+            initStatusEl.textContent = `失敗: ${error.message}`;
+            initStepEl.classList.remove('loading');
+            initStepEl.classList.add('error');
+            
+            // 顯示最終失敗訊息
+            resultMessageEl.classList.remove('hidden');
+            resultMessageEl.classList.add('error');
+            resultTextEl.textContent = '初始化失敗，請確保 Firebase 專案已建立並設定 Identity Toolkit API。';
+        }
+
+        // =======================================================================
+        // 步驟 3 & 4: 身份驗證與測試連線
+        // =======================================================================
+        async function initAuthAndTestConnection(appId) {
+            try {
+                const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                let userCredential;
+
+                // 優先使用自訂 Token 登入 (Canvas 環境專用)
+                if (initialAuthToken) {
+                    authStatusEl.textContent = '嘗試使用自訂 Token 登入...';
+                    userCredential = await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    // 否則使用匿名登入
+                    authStatusEl.textContent = '嘗試使用匿名登入...';
+                    userCredential = await signInAnonymously(auth);
+                }
+
+                userId = userCredential.user.uid;
+                
+                authStatusEl.textContent = '成功！用戶已登入。';
+                authStepEl.classList.remove('loading');
+                authStepEl.classList.add('success');
+
+                userIdEl.textContent = userId;
+                userInfoEl.classList.remove('hidden');
+
+                // 進行連線測試
+                await testFirestoreConnection(appId);
+
+            } catch (error) {
+                // 檢查是否是常見的 API 金鑰錯誤
+                if (error.code === 'auth/invalid-api-key') {
+                    error.message = 'API Key 無效或 API 限制過於嚴格。';
+                }
+                
+                console.error("Firebase 身份驗證失敗:", error);
+                authStatusEl.textContent = `失敗: ${error.message}`;
+                authStepEl.classList.remove('loading');
+                authStepEl.classList.add('error');
+                
+                // Firestore 測試也標記為失敗
+                firestoreStatusEl.textContent = '無法連線 (身份驗證失敗)。';
+                firestoreStepEl.classList.remove('loading');
+                firestoreStepEl.classList.add('error');
+
+                // 顯示最終失敗訊息
+                resultMessageEl.classList.remove('hidden');
+                resultMessageEl.classList.add('error');
+                resultTextEl.textContent = '身份驗證失敗，請檢查 Firebase Identity Toolkit API 是否已啟用。';
+            }
+        }
+
+        // =======================================================================
+        // 步驟 5: 測試 Firestore 資料庫連線
+        // 嘗試讀取一個公開文件來測試權限
+        // =======================================================================
+        async function testFirestoreConnection(appId) {
+            firestoreStatusEl.textContent = '嘗試讀取測試文件...';
+            
+            // 使用公開路徑: /artifacts/{appId}/public/data/status_check/test_doc
+            const docRef = doc(db, `artifacts/${appId}/public/data/status_check/test_doc`);
+
+            try {
+                // 為了測試讀取，我們需要確保文件存在，所以先嘗試寫入（如果不存在則創建）
+                await setDoc(docRef, { 
+                    lastChecked: new Date().toISOString(),
+                    checkedBy: userId 
+                }, { merge: true });
+
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists()) {
+                    firestoreStatusEl.textContent = '成功！資料庫可讀寫。';
+                    firestoreStepEl.classList.remove('loading');
+                    firestoreStepEl.classList.add('success');
+
+                    // 顯示最終成功訊息
+                    resultMessageEl.classList.remove('hidden');
+                    resultMessageEl.classList.add('success');
+                    resultTextEl.textContent = `恭喜！您的 Firebase 專案已完全配置成功，可以開始開發應用程式了。`;
+                } else {
+                    // 如果文件不存在，但寫入成功，我們仍認為連線是成功的，只是讀取測試可能需要更久
+                    firestoreStatusEl.textContent = '成功！文件已建立，資料庫連線正常。';
+                    firestoreStepEl.classList.remove('loading');
+                    firestoreStepEl.classList.add('success');
+                    
+                    // 顯示最終成功訊息
+                    resultMessageEl.classList.remove('hidden');
+                    resultMessageEl.classList.add('success');
+                    resultTextEl.textContent = `恭喜！您的 Firebase 專案已完全配置成功，可以開始開發應用程式了。`;
+                }
+
+            } catch (error) {
+                // 檢查是否是常見的權限錯誤
+                if (error.code === 'permission-denied') {
+                    error.message = '安全規則拒絕存取。';
+                }
+                
+                console.error("Firestore 連線測試失敗:", error);
+                firestoreStatusEl.textContent = `失敗: ${error.message}`;
+                firestoreStepEl.classList.remove('loading');
+                firestoreStepEl.classList.add('error');
+
+                // 顯示最終失敗訊息
+                resultMessageEl.classList.remove('hidden');
+                resultMessageEl.classList.add('error');
+                resultTextEl.textContent = 'Firestore 連線失敗，請**確保您已在 Firebase Console 中建立 Firestore 資料庫，且安全規則允許讀寫**。';
+            }
+        }
     </script>
 </body>
 </html>
