@@ -24,7 +24,6 @@
         }
         /* 確保全螢幕高度，尤其在行動裝置上 */
         .full-screen-container {
-            /* 移除 min-height: 100vh; 以避免鍵盤彈出時產生布局問題，讓內容自然滾動 */
             padding: 1rem; 
             width: 100%; /* 確保在任何螢幕上都能佔滿寬度 */
         }
@@ -89,39 +88,63 @@
     </div>
 
     <!-- 核心 JavaScript 邏輯 (包含 Firebase) -->
-    <script>
-        // *** 請使用您專案的真實 Firebase Config ***
-        const firebaseConfig = {
-            apiKey: "AIzaSyBsMiLUgtJtcv48iRp_9QFx5fShtRd6Lro",
-            authDomain: "kobe-osaka-2026travel.firebaseapp.com",
-            projectId: "kobe-osaka-2026travel",
-            storageBucket: "kobe-osaka-2026travel.firebasestorage.app",
-            messagingSenderId: "772246724994",
-            appId: "1:772246724994:web:26c067ae1096d13ebdef9b"
-        };
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            signInWithEmailAndPassword, 
+            signInWithCustomToken, 
+            signInAnonymously, 
+            onAuthStateChanged 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         
+        // --- Canvas 環境全域變數處理 (REQUIRED) ---
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'; 
+
         let auth;
         
         // DOM 元素參考
         const authError = document.getElementById('auth-error');
         const submitButton = document.getElementById('submit-button');
 
-        // 1. 初始化 Firebase 服務
+        // --- Firebase 初始化與認證 ---
+        
         try {
-            // 由於 Canvas 環境限制，我們在此直接使用全局的 firebase 變數
-            firebase.initializeApp(firebaseConfig);
-            auth = firebase.auth();
+            const app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
             console.log("Firebase initialized successfully.");
 
-            // 檢查是否已登入
-            auth.onAuthStateChanged(user => {
-                if (user) {
-                    console.log("User is already logged in, redirecting to trip.html");
+            // 1. 設定認證狀態變更監聽器 (Listener)
+            onAuthStateChanged(auth, user => {
+                if (user && !user.isAnonymous) {
+                    // 只有當用戶使用正式帳號（非匿名）登入時才重定向
+                    console.log("User is logged in and authenticated, redirecting to trip.html");
                     window.location.href = 'trip.html';
+                } else if (user && user.isAnonymous) {
+                    console.log("User is signed in anonymously, staying on index.html for manual login.");
                 } else {
                     console.log("No user logged in, staying on index.html.");
                 }
             });
+            
+            // 2. 執行強制初始認證 (Canvas REQUIREMENT)
+            async function performInitialAuth() {
+                try {
+                    if (initialAuthToken) {
+                        await signInWithCustomToken(auth, initialAuthToken);
+                        console.log("Signed in with custom token.");
+                    } else {
+                        // 如果沒有提供 Custom Token，則匿名登入
+                        await signInAnonymously(auth);
+                        console.log("Signed in anonymously.");
+                    }
+                } catch (e) {
+                    console.error("Initial auth failed:", e);
+                }
+            }
+            performInitialAuth();
             
         } catch (error) {
             console.error("Firebase 初始化失敗:", error);
@@ -147,6 +170,9 @@
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
 
+            // 清除之前的錯誤訊息
+            authError.style.display = 'none';
+
             if (!email || !password) {
                 showError('請輸入電子郵件和密碼');
                 return;
@@ -157,17 +183,17 @@
             submitButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> 登入中...';
 
             try {
-                await auth.signInWithEmailAndPassword(email, password);
-                // 成功登入，onAuthStateChanged 會自動導向 trip.html
+                // 使用模組化 SDK 的登入函數
+                await signInWithEmailAndPassword(auth, email, password);
+                // 成功登入，onAuthStateChanged 會自動檢查並導向 trip.html
+                // 不需要在這裡手動重定向
             } catch (error) {
                 console.error("登入失敗:", error);
                 let errorMessage;
                 switch (error.code) {
                     case 'auth/user-not-found':
-                        errorMessage = '此電子郵件不存在。';
-                        break;
                     case 'auth/wrong-password':
-                        errorMessage = '密碼錯誤，請重新輸入。';
+                        errorMessage = '電子郵件或密碼錯誤，請重新輸入。';
                         break;
                     case 'auth/invalid-email':
                         errorMessage = '電子郵件格式不正確。';
@@ -179,8 +205,6 @@
             }
         }
         window.handleLogin = handleLogin;
-        
-        // handleAnonymousLogin 函數已移除
     </script>
 </body>
 </html>

@@ -3,484 +3,251 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>神戶大阪行程規劃 App</title>
-    <!-- 引入 Tailwind CSS 3.x (用於全部造型和響應式設計) -->
+    <title>我的旅行計畫</title>
+    <!-- 引入 Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入 Bootstrap 5 JS Bundle (僅用於 Modal 彈窗功能) -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
-    <!-- 引入 Font Awesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
-        /* 使用 Noto Sans CJK TC 確保中文字體顯示清晰 */
-        body {
-            font-family: "Noto Sans CJK TC", "Inter", sans-serif;
-            min-height: 100vh;
-            background-color: #f7f9fb; /* 淺灰色背景 */
+        /* 使用 Inter 字體 */
+        :root {
+            font-family: 'Inter', sans-serif;
         }
-        /* 隱藏桌面瀏覽器上的捲軸，但允許行動裝置捲動 */
-        main {
-            padding-bottom: 6rem; /* 為底部導航欄保留空間 */
+        /* 自定義滾動條樣式，讓它更美觀 */
+        ::-webkit-scrollbar {
+            width: 8px;
         }
-        /* 模擬日本風格的藍色主題 */
-        .kobe-osaka-blue {
-            background: linear-gradient(145deg, #1e40af 0%, #3b82f6 100%); /* 深藍到淺藍漸變 */
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
         }
-        .day-card {
-            transition: transform 0.2s, box-shadow 0.2s;
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1; /* slate-300 */
+            border-radius: 4px;
         }
-        .day-card:active {
-            transform: scale(0.98);
-        }
-        /* 確保 Bootstrap Modal JS 正常運作的必要設置 */
-        .modal-backdrop.fade.show {
-            opacity: 0.75;
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; /* slate-400 */
         }
     </style>
 </head>
-<body>
+<body class="bg-gray-50 min-h-screen">
 
-    <!-- 頂部標題和使用者狀態 -->
-    <header class="sticky top-0 z-10 w-full kobe-osaka-blue text-white p-4 shadow-lg rounded-b-xl">
-        <div class="flex justify-between items-center max-w-4xl mx-auto">
-            <h1 class="text-xl font-bold flex items-center">
-                <i class="fas fa-route mr-2"></i> 關西五日遊
-            </h1>
-            <span class="text-sm opacity-80" id="user-status">行程列表</span>
-        </div>
-    </header>
+    <div class="container mx-auto px-4 py-8">
+        <header class="mb-8 flex justify-between items-center">
+            <h1 class="text-3xl font-bold text-gray-800 border-b-4 border-indigo-500 pb-1">當前行程</h1>
+        </header>
 
-    <!-- 主內容區 -->
-    <main class="container mx-auto p-4 max-w-4xl">
-        
-        <!-- 訊息/狀態區 -->
-        <div id="itinerary-status" class="text-center p-6 text-gray-500 loading-state">
-            <i class="fas fa-spinner fa-spin mr-2"></i> 正在檢查登入狀態...
+        <!-- 行程卡片列表 (只顯示當前行程) -->
+        <div id="trip-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- 行程卡片將由 JavaScript 動態生成 -->
         </div>
 
-        <!-- 行程卡片列表 -->
-        <div id="itinerary-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <!-- Data will be populated here -->
+        <!-- 如果沒有當前行程時的提示 -->
+        <div id="no-trips-message" class="hidden text-center py-20 bg-white rounded-xl shadow-lg mt-8">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">目前沒有進行中的行程</h3>
+            <p class="mt-1 text-sm text-gray-500">點擊右下角的「+」號新增第一個行程吧！</p>
         </div>
-    </main>
+    </div>
 
-    <!-- 底部固定導航欄 (Mobile App 菜單) -->
-    <nav class="fixed bottom-0 left-0 right-0 h-24 bg-white shadow-2xl z-20 rounded-t-2xl border-t border-gray-100">
-        <div class="flex justify-around items-center h-full max-w-md mx-auto">
-            
-            <!-- 1. 新增行程按鈕 (FAB 樣式) -->
-            <button class="bg-indigo-600 hover:bg-indigo-700 text-white p-4 rounded-full shadow-lg transform translate-y-[-50%] transition duration-200 active:scale-95 focus:outline-none" 
-                    title="新增行程"
-                    onclick="openEditModal(null)">
-                <i class="fas fa-plus fa-2x"></i>
-            </button>
+    <!-- 浮動操作按鈕 (FAB) - 新增行程 -->
+    <button id="fab-add-trip" class="fixed bottom-6 right-6 w-14 h-14 bg-indigo-600 text-white rounded-full shadow-xl hover:bg-indigo-700 transition duration-300 flex items-center justify-center focus:outline-none transform hover:scale-110 z-30">
+        <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        </svg>
+    </button>
 
-            <!-- 2. 功能頁面連結 -->
-            <a href="features.html" class="flex flex-col items-center text-gray-600 hover:text-indigo-600 transition">
-                <i class="fas fa-cogs text-xl"></i>
-                <span class="text-xs mt-1">其他功能</span>
-            </a>
-
-            <!-- 3. 登出按鈕 -->
-            <button class="flex flex-col items-center text-gray-600 hover:text-red-600 transition" 
-                    onclick="handleLogout()"
-                    title="登出">
-                <i class="fas fa-sign-out-alt text-xl"></i>
-                <span class="text-xs mt-1">登出</span>
-            </button>
-        </div>
-    </nav>
-
-
-    <!-- --- MODALS (使用 Bootstrap JS 保持功能穩定) --- -->
-
-    <!-- 新增/編輯行程 Modal 模態框 -->
-    <div class="modal fade" id="add-day-modal" tabindex="-1" aria-labelledby="add-day-modal-title" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content rounded-xl shadow-2xl">
-                <div class="modal-header bg-indigo-50 border-b border-indigo-200">
-                    <h5 class="modal-title font-bold text-indigo-700" id="add-day-modal-title">新增行程日</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body p-5">
-                    <div id="modal-error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-4" style="display: none;"></div>
-                    <form id="add-day-form" onsubmit="event.preventDefault(); submitDayForm();">
-                        <div class="mb-4">
-                            <label for="day-num-input" class="block text-sm font-medium text-gray-700 mb-1">Day 數字 (例如: 3)</label>
-                            <input type="number" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" id="day-num-input" required min="1" placeholder="輸入 Day 數字">
-                            <p class="mt-1 text-xs text-gray-500">這將決定行程的排序。</p>
-                        </div>
-                        <div class="mb-4">
-                            <label for="location-input" class="block text-sm font-medium text-gray-700 mb-1">地點名稱</label>
-                            <input type="text" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" id="location-input" placeholder="例如: 環球影城">
-                        </div>
-                        <div class="mb-4">
-                            <label for="description-input" class="block text-sm font-medium text-gray-700 mb-1">詳細描述 / 注意事項</label>
-                            <textarea class="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" id="description-input" rows="5" placeholder="例如: 早上搭車，中午玩哈利波特區..."></textarea>
-                        </div>
-                        <div class="mb-4">
-                            <label for="area-input" class="block text-sm font-medium text-gray-700 mb-1">區域 (城市)</label>
-                            <input type="text" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" id="area-input" placeholder="例如: 大阪">
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer flex justify-end p-4 border-t border-gray-200">
-                    <button type="button" class="btn bg-gray-200 text-gray-700 hover:bg-gray-300 px-4 py-2 rounded-lg mr-2" data-bs-dismiss="modal">取消</button>
-                    <button type="button" class="btn bg-indigo-600 text-white hover:bg-indigo-700 px-4 py-2 rounded-lg" id="submit-day-button" onclick="submitDayForm()">新增行程</button>
-                </div>
+    <!-- 模態視窗 1: 新增行程 (預設隱藏) -->
+    <div id="new-trip-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden items-center justify-center p-4 z-40">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg transform transition-all overflow-hidden">
+            <div class="p-6">
+                <h2 class="text-2xl font-semibold text-gray-800 mb-4 border-b pb-2">新增行程</h2>
+                
+                <form>
+                    <div class="mb-4">
+                        <label for="trip-name" class="block text-sm font-medium text-gray-700 mb-1">行程名稱</label>
+                        <input type="text" id="trip-name" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" placeholder="例如：墾丁三天兩夜">
+                    </div>
+                    <div class="mb-4">
+                        <label for="trip-dates" class="block text-sm font-medium text-gray-700 mb-1">日期範圍</label>
+                        <input type="text" id="trip-dates" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" placeholder="例如：2025/12/24 - 2025/12/26">
+                    </div>
+                    <div class="mb-4">
+                        <label for="trip-location" class="block text-sm font-medium text-gray-700 mb-1">地點</label>
+                        <input type="text" id="trip-location" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" placeholder="例如：屏東縣恆春鎮">
+                    </div>
+                    <div class="mb-6">
+                        <label for="trip-notes" class="block text-sm font-medium text-gray-700 mb-1">備註/待辦事項</label>
+                        <textarea id="trip-notes" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" placeholder="例如：訂機票、準備防曬乳"></textarea>
+                    </div>
+                    
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" onclick="closeNewTripModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition duration-150">取消</button>
+                        <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition duration-150">確認新增</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
 
-    <!-- 行程詳細檢視 Modal -->
-    <div class="modal fade" id="day-detail-modal" tabindex="-1" aria-labelledby="detail-modal-title" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content rounded-xl shadow-2xl">
-                <div class="modal-header kobe-osaka-blue text-white border-b border-indigo-300">
-                    <h5 class="modal-title font-extrabold" id="detail-modal-title">行程詳細資訊</h5>
-                    <button type="button" class="text-white opacity-70 hover:opacity-100" data-bs-dismiss="modal" aria-label="Close">
-                         <i class="fas fa-times"></i>
+    <!-- 模態視窗 2: 行程詳情 (預設隱藏) -->
+    <div id="trip-detail-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden items-center justify-center p-4 z-40">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl transform transition-all overflow-hidden max-h-[90vh] flex flex-col">
+            <div class="p-6 flex-grow overflow-y-auto">
+                <div class="flex justify-between items-start mb-4 border-b pb-2">
+                    <h2 id="detail-name" class="text-3xl font-bold text-gray-800"></h2>
+                    <button onclick="closeDetailModal()" class="text-gray-400 hover:text-gray-600 transition duration-150 p-1 rounded-full bg-gray-100 hover:bg-gray-200">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>
                 </div>
-                <div class="modal-body p-6">
-                    <div class="space-y-4">
-                        <div class="flex items-center">
-                            <dt class="w-1/4 font-semibold text-gray-600 flex items-center"><i class="fas fa-map-pin mr-2 text-indigo-500"></i> 地點</dt>
-                            <dd class="w-3/4"><h4 id="detail-location" class="text-xl font-bold text-gray-800"></h4></dd>
-                        </div>
 
-                        <div class="flex items-center">
-                            <dt class="w-1/4 font-semibold text-gray-600 flex items-center"><i class="fas fa-city mr-2 text-indigo-500"></i> 區域</dt>
-                            <dd class="w-3/4"><p id="detail-area" class="text-gray-600"></p></dd>
-                        </div>
+                <div class="space-y-4 text-gray-700">
+                    <div class="flex items-center space-x-2">
+                        <svg class="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-4 4V3m-4 12v-2m4 2v-2m4 2v-2M5 11h14M3 15h18M3 19h18"/></svg>
+                        <p class="font-medium">日期：<span id="detail-date" class="font-normal"></span></p>
+                    </div>
 
-                        <div class="pt-4 border-t border-gray-100">
-                            <dt class="font-semibold text-gray-600 flex items-center mb-2"><i class="fas fa-scroll mr-2 text-indigo-500"></i> 詳細行程與注意事項</dt>
-                            <dd>
-                                <div id="detail-description" class="p-4 border border-indigo-100 rounded-lg bg-indigo-50 text-gray-700 whitespace-pre-wrap"></div>
-                            </dd>
-                        </div>
+                    <div class="flex items-center space-x-2">
+                        <svg class="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        <p class="font-medium">地點：<span id="detail-location" class="font-normal"></span></p>
+                    </div>
+
+                    <div>
+                        <h3 class="text-lg font-semibold text-indigo-600 mt-4 mb-2">注意事項/備註</h3>
+                        <p id="detail-notes" class="bg-indigo-50 p-3 rounded-lg border border-indigo-200 whitespace-pre-wrap"></p>
+                    </div>
+
+                    <div>
+                        <h3 class="text-lg font-semibold text-indigo-600 mt-4 mb-2">Google 導航</h3>
+                        <a id="detail-nav-link" href="#" target="_blank" class="inline-flex items-center space-x-2 text-white bg-green-500 hover:bg-green-600 px-4 py-2 rounded-lg transition duration-150 shadow-md">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.553-.894L12 10.518m0 0l8.447-4.224A1 1 0 0121 5.618v10.764a1 1 0 01-.553.894L12 20m0 0l-4-2m4 2v-6"/></svg>
+                            <span id="detail-nav-text">開啟 Google 地圖導航</span>
+                        </a>
                     </div>
                 </div>
-                <div class="modal-footer flex justify-between p-4 border-t border-gray-200">
-                    <!-- 編輯按鈕 -->
-                    <button type="button" class="bg-yellow-500 text-white hover:bg-yellow-600 px-4 py-2 rounded-lg shadow-md transition" id="detail-edit-button">
-                        <i class="fas fa-edit mr-1"></i> 編輯此行程
-                    </button>
-                    <!-- 地圖連結 -->
-                    <a href="#" id="map-button" class="bg-blue-500 text-white hover:bg-blue-600 px-4 py-2 rounded-lg shadow-md transition" target="_blank" rel="noopener noreferrer">
-                        <i class="fas fa-globe mr-1"></i> 查看地圖 (Google Maps)
-                    </a>
-                    <button type="button" class="bg-gray-200 text-gray-700 hover:bg-gray-300 px-4 py-2 rounded-lg" data-bs-dismiss="modal">關閉</button>
-                </div>
             </div>
         </div>
     </div>
 
-    <!-- 核心 JavaScript 邏輯 (包含 Firebase) -->
     <script>
-        // 引入 Firebase SDK (版本 8.10.0)
-        // 注意：為了簡化和確保在 Canvas 環境中穩定運行，我們繼續使用 v8 SDK
-        // 如果您在自己的開發環境中，建議使用 v9 或更高版本
-        
-        // 1. 引入 Firebase SDK
-        // 這裡不需要額外的 script 標籤，因為我們將它們都放在這裡：
-        /*
-        <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-        <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-        <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-        */
+        // 模擬行程資料
+        const allTrips = [
+            { id: 1, name: '墾丁三天兩夜', date: '2025/12/24 - 2025/12/26', status: 'Current', notes: '記得帶泳衣和防曬乳。\n確認住宿：凱撒大飯店。', location: '屏東縣恆春鎮', navLink: 'https://maps.app.goo.gl/k9rK3eD5m6dF7P3p7' },
+            { id: 2, name: '台中美食之旅', date: '2025/11/30 - 2025/12/01', status: 'Past', notes: '宮原眼科必去！\n第二市場早餐。', location: '台中市', navLink: 'https://maps.app.goo.gl/B4jH5G8F9H7K2L5m8' },
+            { id: 3, name: '日本東京五日遊', date: '2026/01/10 - 2026/01/14', status: 'Current', notes: '確認機票和飯店預訂。\n購買 JR Pass。', location: '日本東京', navLink: 'https://maps.app.goo.gl/M8pL4k3j2H1g9F6e5' },
+            { id: 4, name: '陽明山一日遊', date: '2025/11/01', status: 'Past', notes: '賞楓拍照。', location: '台北市', navLink: 'https://maps.app.goo.gl/R5eT6Y1u7I2o3P4q9' },
+        ];
 
-        // *** 請使用您專案的真實 Firebase Config ***
-        const firebaseConfig = {
-            apiKey: "AIzaSyBsMiLUgtJtcv48iRp_9QFx5fShtRd6Lro",
-            authDomain: "kobe-osaka-2026travel.firebaseapp.com",
-            projectId: "kobe-osaka-2026travel",
-            storageBucket: "kobe-osaka-2026travel.firebasestorage.app",
-            messagingSenderId: "772246724994",
-            appId: "1:772246724994:web:26c067ae1096d13ebdef9b"
-        };
+        // 篩選只顯示當前行程
+        const currentTrips = allTrips.filter(trip => trip.status === 'Current');
 
-        // DOM 元素參考
-        const itineraryList = document.getElementById('itinerary-list');
-        const itineraryStatus = document.getElementById('itinerary-status');
-        
-        let db;
-        let auth;
-        let unsubscribe = null; 
-        let editModalInstance; // 編輯 Modal 實例
-        let detailModalInstance; // 詳細檢視 Modal 實例
-        let isEditMode = false; 
-        let currentDocId = null; 
-
-        // 1. 初始化 Firebase 服務
-        try {
-            firebase.initializeApp(firebaseConfig);
-            db = firebase.firestore();
-            auth = firebase.auth();
-            console.log("Firebase initialized successfully."); 
-        } catch (error) {
-            console.error("Firebase 初始化失敗:", error);
-            itineraryStatus.innerHTML = '<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg"><i class="fas fa-times-circle mr-2"></i> Firebase 初始化失敗。請檢查您的 config 設定。</div>';
-        }
+        const tripListElement = document.getElementById('trip-list');
+        const noTripsMessage = document.getElementById('no-trips-message');
+        const newTripModal = document.getElementById('new-trip-modal');
+        const tripDetailModal = document.getElementById('trip-detail-modal');
 
         /**
-         * 處理行程資料的實時監聽與渲染
+         * 渲染當前行程卡片
          */
-        function startItineraryListener() {
-            if (unsubscribe) {
-                unsubscribe();
-            }
+        function renderTrips() {
+            tripListElement.innerHTML = ''; // 清空列表
 
-            itineraryStatus.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> 正在從 Firestore 載入行程...';
-            itineraryList.innerHTML = '';
-
-            // 實時監聽 'itinerary' 集合，並依文件 ID 排序
-            unsubscribe = db.collection("itinerary").orderBy(firebase.firestore.FieldPath.documentId(), "asc")
-                .onSnapshot((querySnapshot) => {
-                    itineraryList.innerHTML = ''; 
-                    itineraryStatus.innerHTML = ''; // 清除 loading 狀態
-                    
-                    if (querySnapshot.empty) {
-                        itineraryStatus.innerHTML = '<div class="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded-lg"><i class="fas fa-exclamation-triangle mr-2"></i> 目前沒有行程。點擊底部 <i class="fas fa-plus"></i> 開始規劃！</div>';
-                        console.log("Firestore: Itinerary collection is empty."); 
-                        return;
-                    }
-
-                    console.log(`Firestore: Found ${querySnapshot.size} itinerary documents.`); 
-
-                    // 遍歷所有文件並生成 HTML
-                    querySnapshot.forEach((doc) => {
-                        const data = doc.data();
-                        const docId = doc.id;
-                        
-                        const dayMatch = docId.match(/Day(\d+)/i);
-                        const dayDisplay = dayMatch ? `DAY ${dayMatch[1]}` : docId.toUpperCase();
-
-                        // 確保資料是 HTML 安全的
-                        const safeLocation = (data.location || '地點未定').replace(/'/g, '&#39;');
-                        const safeDescription = (data.description || '點擊查看詳細描述...').replace(/'/g, '&#39;');
-                        const safeArea = (data.area || '關西地區').replace(/'/g, '&#39;');
-
-                        // 新增：卡片點擊事件改為開啟詳細檢視 Modal
-                        const cardHtml = `
-                            <div class="day-card bg-white p-5 rounded-xl shadow-lg border-l-4 border-indigo-400 relative overflow-hidden cursor-pointer" 
-                                onclick="openDayDetailModal('${docId}', '${safeLocation}', '${safeDescription}', '${safeArea}')">
-                                
-                                <!-- 刪除按鈕 (絕對定位) -->
-                                <button class="delete-btn absolute top-3 right-3 text-red-500 hover:text-red-700 z-10 p-1 bg-white rounded-full transition" 
-                                    onclick="event.stopPropagation(); deleteDay('${docId}')" title="刪除行程">
-                                    <i class="fas fa-trash-alt"></i>
-                                </button>
-                                
-                                <div class="day-marker text-indigo-700 font-extrabold text-3xl mb-1">${dayDisplay}</div>
-                                <h5 class="mt-2 text-2xl font-bold text-gray-900">${data.location || '地點未定'}</h5>
-                                <p class="text-sm text-gray-500 mb-4">${data.area || '關西地區'}</p>
-                                
-                                <!-- 摘要 -->
-                                <div class="flex items-center text-indigo-600 text-sm font-medium">
-                                    <i class="fas fa-info-circle mr-1"></i> ${data.description.substring(0, 25) + (data.description.length > 25 ? '...' : '') || '點擊查看詳細行程...'}
-                                </div>
-                            </div>
-                        `;
-                        itineraryList.innerHTML += cardHtml;
-                    });
-
-                }, (error) => {
-                    console.error("實時監聽資料失敗: ", error);
-                    itineraryStatus.innerHTML = `<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg"><i class="fas fa-lock mr-2"></i> 資料讀取失敗。原因：**權限不足** 或網路錯誤。</div>`;
-                });
-        }
-
-        // --- 詳細檢視 (View) 函數 ---
-        function openDayDetailModal(docId, location, description, area) {
-            const detailModalTitle = document.getElementById('detail-modal-title');
-            const detailLocation = document.getElementById('detail-location');
-            const detailArea = document.getElementById('detail-area');
-            const detailDescription = document.getElementById('detail-description');
-            const mapButton = document.getElementById('map-button');
-            const editButton = document.getElementById('detail-edit-button');
-
-            // 1. 清理資料
-            const cleanedLocation = location.replace(/&#39;/g, "'");
-            const cleanedDescription = description.replace(/&#39;/g, "'");
-            const cleanedArea = area.replace(/&#39;/g, "'");
-
-            // 2. 填充 Modal 內容
-            detailModalTitle.textContent = `${docId.toUpperCase()} - ${cleanedLocation}`;
-            detailLocation.textContent = cleanedLocation;
-            detailArea.textContent = cleanedArea;
-            detailDescription.textContent = cleanedDescription; // 使用 textContent 保持換行符號
-
-            // 3. 地圖連結：建構 Google Maps 搜尋 URL
-            const searchQuery = `${cleanedLocation}, ${cleanedArea}, 神戶大阪`;
-            const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(searchQuery)}`;
-            mapButton.href = mapUrl;
-
-            // 4. 設定編輯按鈕
-            editButton.onclick = () => {
-                detailModalInstance.hide(); // 關閉檢視 Modal
-                openEditModal(docId, cleanedLocation, cleanedDescription, cleanedArea); // 開啟編輯 Modal
-            };
-
-            // 5. 顯示 Modal
-            detailModalInstance.show();
-        }
-        window.openDayDetailModal = openDayDetailModal;
-        
-        // --- CRUD (Edit/Add/Delete) 操作函數 ---
-
-        /**
-         * 開啟新增或編輯行程的 Modal
-         */
-        function openEditModal(docId = null, location = '', description = '', area = '') {
-            const title = document.getElementById('add-day-modal-title');
-            const dayNumInput = document.getElementById('day-num-input');
-            const submitButton = document.getElementById('submit-day-button');
-            const modalErrorDiv = document.getElementById('modal-error');
-
-            modalErrorDiv.style.display = 'none';
-            document.getElementById('add-day-form').reset();
-            
-            isEditMode = docId !== null;
-            currentDocId = docId;
-
-            if (isEditMode) {
-                // 編輯模式
-                title.textContent = `編輯行程：${docId.toUpperCase()}`;
-                submitButton.textContent = '儲存變更';
-                
-                const dayMatch = docId.match(/Day(\d+)/i);
-                if (dayMatch) {
-                    dayNumInput.value = dayMatch[1];
-                    dayNumInput.disabled = true; // 編輯時不允許修改 Day 數字
-                }
-                
-                // 填充現有資料
-                document.getElementById('location-input').value = location.replace(/&#39;/g, "'");
-                document.getElementById('description-input').value = description.replace(/&#39;/g, "'");
-                document.getElementById('area-input').value = area.replace(/&#39;/g, "'");
-            } else {
-                // 新增模式
-                title.textContent = '新增行程日';
-                submitButton.textContent = '新增行程';
-                dayNumInput.disabled = false;
-            }
-            
-            editModalInstance.show();
-        }
-        window.openEditModal = openEditModal; 
-
-        /**
-         * 處理表單提交：新增或更新行程
-         */
-        async function submitDayForm() {
-            const dayNum = document.getElementById('day-num-input').value.trim();
-            const location = document.getElementById('location-input').value.trim();
-            const description = document.getElementById('description-input').value.trim();
-            const area = document.getElementById('area-input').value.trim();
-            const modalErrorDiv = document.getElementById('modal-error');
-            const submitButton = document.getElementById('submit-day-button');
-            const originalButtonText = submitButton.textContent; 
-
-            modalErrorDiv.style.display = 'none';
-
-            if (!dayNum || isNaN(parseInt(dayNum)) || parseInt(dayNum) < 1) {
-                modalErrorDiv.textContent = '請輸入有效的 Day 數字 (例如: 3)';
-                modalErrorDiv.style.display = 'block';
+            if (currentTrips.length === 0) {
+                noTripsMessage.classList.remove('hidden');
                 return;
+            } else {
+                noTripsMessage.classList.add('hidden');
             }
-            
-            const docId = `Day${dayNum}`; 
-            
-            // 啟用載入狀態
-            submitButton.disabled = true;
-            submitButton.innerHTML = `<i class="fas fa-spinner fa-spin mr-2"></i> ${isEditMode ? '儲存中...' : '新增中...'}`;
 
-            const newDayData = {
-                location: location || '地點未定',
-                description: description || '點擊文件來新增詳細描述...',
-                area: area || '關西地區',
-                createdAt: isEditMode ? undefined : firebase.firestore.FieldValue.serverTimestamp(), 
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            };
-            
-            let finalDocId = isEditMode ? currentDocId : docId;
+            currentTrips.forEach(trip => {
+                const card = document.createElement('div');
+                card.classList.add(
+                    'bg-white', 'rounded-xl', 'shadow-lg', 'p-6', 'cursor-pointer',
+                    'hover:shadow-xl', 'transition', 'duration-300', 'border-l-4',
+                    'border-indigo-500', 'transform', 'hover:-translate-y-1'
+                );
+                card.dataset.tripId = trip.id;
+                card.innerHTML = `
+                    <h3 class="text-xl font-semibold text-gray-900 mb-2">${trip.name}</h3>
+                    <div class="text-sm text-gray-500 space-y-1">
+                        <p class="flex items-center"><svg class="w-4 h-4 mr-2 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-4 4V3M5 11h14M3 15h18M3 19h18"/></svg>${trip.date}</p>
+                        <p class="flex items-center"><svg class="w-4 h-4 mr-2 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>${trip.location}</p>
+                        <p class="mt-3 text-indigo-600 font-medium">點擊查看詳情...</p>
+                    </div>
+                `;
 
-            try {
-                await db.collection("itinerary").doc(finalDocId).set(newDayData, { merge: true });
+                // 綁定點擊事件，顯示行程詳情模態視窗
+                card.addEventListener('click', () => openDetailModal(trip.id));
 
-                editModalInstance.hide();
-                itineraryStatus.innerHTML = `<div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg mt-4"><i class="fas fa-check-circle mr-2"></i> 行程 **${finalDocId}** ${isEditMode ? '更新' : '新增'}成功！</div>`;
-                console.log(`Firestore: Document ${finalDocId} successfully ${isEditMode ? 'updated' : 'added'}.`); 
-
-            } catch (error) {
-                console.error("新增/更新行程失敗:", error);
-                modalErrorDiv.textContent = `操作失敗: ${error.message}。請確認 Firestore 寫入權限 (Rules)。`;
-                modalErrorDiv.style.display = 'block';
-            } finally {
-                // 恢復按鈕狀態
-                submitButton.disabled = false;
-                submitButton.innerHTML = originalButtonText;
-                setTimeout(() => itineraryStatus.innerHTML = '', 4000); // 4秒後清除成功訊息
-            }
+                tripListElement.appendChild(card);
+            });
         }
-        window.submitDayForm = submitDayForm;
 
         /**
-         * 刪除指定行程
+         * 顯示新增行程模態視窗
          */
-        function deleteDay(docId) {
-            const isConfirmed = confirm(`您確定要刪除行程 ${docId} 嗎？此操作無法復原。`);
-            if (!isConfirmed) return;
+        document.getElementById('fab-add-trip').addEventListener('click', () => {
+            newTripModal.classList.remove('hidden');
+            newTripModal.classList.add('flex');
+        });
 
-            db.collection("itinerary").doc(docId).delete().then(() => {
-                itineraryStatus.innerHTML = `<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mt-4"><i class="fas fa-trash-alt mr-2"></i> 行程 **${docId}** 刪除成功！</div>`;
-                console.log(`Firestore: Document ${docId} successfully deleted.`); 
-                setTimeout(() => itineraryStatus.innerHTML = '', 4000); 
-            }).catch((error) => {
-                console.error("刪除行程失敗:", error);
-                itineraryStatus.innerHTML = `<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mt-4">刪除行程失敗: ${error.message}。請確認 Firestore 刪除權限 (Rules)。</div>`;
-            });
+        /**
+         * 關閉新增行程模態視窗
+         */
+        function closeNewTripModal() {
+            newTripModal.classList.add('hidden');
+            newTripModal.classList.remove('flex');
+            // 可在此處清空表單
+            // document.querySelector('#new-trip-modal form').reset();
         }
-        window.deleteDay = deleteDay; 
-        
-        // --- 登入/登出邏輯 ---
-        function handleLogout() {
-            auth.signOut().then(() => {
-                window.location.href = 'index.html'; 
-            }).catch((error) => {
-                console.error("登出失敗:", error);
-            });
+
+        /**
+         * 顯示行程詳情模態視窗
+         * @param {number} id - 行程ID
+         */
+        function openDetailModal(id) {
+            const trip = allTrips.find(t => t.id === id);
+            if (!trip) return;
+
+            // 填充詳情內容
+            document.getElementById('detail-name').textContent = trip.name;
+            document.getElementById('detail-date').textContent = trip.date;
+            document.getElementById('detail-location').textContent = trip.location;
+            document.getElementById('detail-notes').textContent = trip.notes;
+
+            const navLinkElement = document.getElementById('detail-nav-link');
+            navLinkElement.href = trip.navLink;
+            document.getElementById('detail-nav-text').textContent = `開啟 Google 地圖 (${trip.location}) 導航`;
+            
+            // 顯示模態視窗
+            tripDetailModal.classList.remove('hidden');
+            tripDetailModal.classList.add('flex');
         }
-        window.handleLogout = handleLogout;
 
+        /**
+         * 關閉行程詳情模態視窗
+         */
+        function closeDetailModal() {
+            tripDetailModal.classList.add('hidden');
+            tripDetailModal.classList.remove('flex');
+        }
 
-        // 3. 監聽 Firebase 身份驗證狀態變化
-        auth.onAuthStateChanged((user) => {
-            if (user) {
-                console.log(`Auth State: User logged in with UID: ${user.uid}`); 
-                document.getElementById('user-status').textContent = `已登入 (${user.uid.substring(0, 5)}...)`;
-                startItineraryListener();
-            } else {
-                console.log("Auth State: User not logged in, redirecting to index.html."); 
-                window.location.href = 'index.html';
+        // 初始渲染
+        document.addEventListener('DOMContentLoaded', renderTrips);
+
+        // 點擊背景關閉模態視窗 (New Trip Modal)
+        newTripModal.addEventListener('click', (e) => {
+            if (e.target === newTripModal) {
+                closeNewTripModal();
             }
         });
 
-        // 初始化 Modal 實例
-        document.addEventListener('DOMContentLoaded', () => {
-            editModalInstance = new bootstrap.Modal(document.getElementById('add-day-modal'));
-            detailModalInstance = new bootstrap.Modal(document.getElementById('day-detail-modal'));
-
-            // 確保每次編輯 Modal 關閉時清除編輯狀態和錯誤訊息
-            const editModalElement = document.getElementById('add-day-modal');
-            editModalElement.addEventListener('hidden.bs.modal', function () {
-                document.getElementById('modal-error').style.display = 'none';
-                document.getElementById('day-num-input').disabled = false;
-                isEditMode = false;
-                currentDocId = null;
-            });
+        // 點擊背景關閉模態視窗 (Detail Modal)
+        tripDetailModal.addEventListener('click', (e) => {
+            if (e.target === tripDetailModal) {
+                closeDetailModal();
+            }
         });
+
     </script>
 </body>
 </html>
