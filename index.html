@@ -3,74 +3,91 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>我的行程清單</title>
+    <title>登入 | 神戶大阪行程規劃</title>
+    <!-- 引入 Tailwind CSS (用於全部造型和響應式設計) -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        /* 使用 Noto Sans CJK TC 確保中文字體顯示清晰 */
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f7f9fb;
+            font-family: "Noto Sans CJK TC", "Inter", sans-serif;
+            min-height: 100vh;
+            background-color: #f7f9fb; /* 淺灰色背景 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
-        .container-card {
-            max-width: 800px;
-            margin: 2rem auto;
-            background: white;
-            padding: 2rem;
-            border-radius: 12px;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        /* 模擬日本風格的藍色主題 */
+        .kobe-osaka-blue {
+            background: linear-gradient(145deg, #1e40af 0%, #3b82f6 100%); /* 深藍到淺藍漸變 */
         }
         /* 確保全螢幕高度，尤其在行動裝置上 */
         .full-screen-container {
             padding: 1rem; 
             width: 100%; /* 確保在任何螢幕上都能佔滿寬度 */
-        .itinerary-item {
-            border-bottom: 1px solid #e2e8f0;
-            transition: background-color 0.15s;
-        }
-        .itinerary-item:last-child {
-            border-bottom: none;
-        }
-        .itinerary-item:hover {
-            background-color: #f9fafb;
         }
     </style>
 </head>
 <body>
 
-<div class="container-card">
-    <div class="flex justify-between items-center mb-6">
-        <h1 class="text-3xl font-bold text-gray-900">我的行程</h1>
-        <button id="add-itinerary-btn" class="flex items-center px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition duration-150 shadow-md">
-            <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-            新增行程
-        </button>
+    <div class="full-screen-container w-full max-w-md mx-auto flex flex-col justify-center items-center">
+
+        <!-- App 標題區 -->
+        <header class="text-center mb-8 pt-10 sm:pt-0">
+            <div class="kobe-osaka-blue p-3 rounded-full inline-block shadow-lg">
+                <i class="fas fa-route text-white text-3xl"></i>
+            </div>
+            <h1 class="text-3xl font-extrabold text-gray-800 mt-3">神戶大阪之旅</h1>
+            <p class="text-gray-500 text-sm">行程共享與規劃 - 僅限登入</p>
+        </header>
+
+        <!-- 登入卡片 -->
+        <div class="w-full bg-white rounded-2xl shadow-2xl p-6 sm:p-8 border border-gray-100">
+            
+            <h3 class="text-2xl font-bold text-gray-700 text-center mb-6 border-b pb-4">帳號登入</h3>
+            
+            <!-- 錯誤訊息顯示區 -->
+            <div id="auth-error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-4" style="display: none;">
+                <!-- 錯誤訊息將顯示在這裡 -->
+            </div>
+            
+            <!-- 表單區 -->
+            <form id="auth-form" onsubmit="event.preventDefault(); handleLogin()">
+                <div class="space-y-5">
+                    
+                    <!-- Email 輸入 -->
+                    <div>
+                        <label for="email" class="block text-sm font-medium text-gray-700 mb-1">電子郵件</label>
+                        <div class="relative">
+                            <i class="fas fa-envelope absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                            <input type="email" id="email" class="w-full p-3 pl-10 border border-gray-300 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 transition" required placeholder="name@example.com">
+                        </div>
+                    </div>
+
+                    <!-- 密碼輸入 -->
+                    <div>
+                        <label for="password" class="block text-sm font-medium text-gray-700 mb-1">密碼</label>
+                        <div class="relative">
+                            <i class="fas fa-lock absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                            <input type="password" id="password" class="w-full p-3 pl-10 border border-gray-300 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 transition" required placeholder="請輸入密碼">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 提交按鈕 -->
+                <button type="submit" id="submit-button" class="mt-8 w-full kobe-osaka-blue text-white p-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition duration-300 active:scale-98">
+                    <i class="fas fa-sign-in-alt mr-2"></i> 登入
+                </button>
+            </form>
+        </div>
+        
+        <p class="text-xs text-gray-400 mt-4 pb-10 sm:pb-0">請使用已註冊的帳號登入。</p>
     </div>
 
-    <div id="loading-spinner" class="text-center py-10">
-        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 inline-block"></div>
-        <p class="mt-2 text-gray-500">正在載入行程資料...</p>
-    </div>
-
-    <div id="itinerary-list" class="space-y-0 border border-gray-200 rounded-lg overflow-hidden hidden">
-        <!-- 行程項目將由 JavaScript 渲染到這裡 -->
-    </div>
-    
-    <div id="empty-state" class="text-center py-10 hidden">
-        <svg class="w-12 h-12 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-        <h3 class="mt-2 text-sm font-medium text-gray-900">尚未新增任何行程</h3>
-        <p class="mt-1 text-sm text-gray-500">點擊上方按鈕開始規劃您的旅程！</p>
-    </div>
-
-</div>
-
-<!-- Firebase Modules -->
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, collection, query, onSnapshot, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-    <!-- 核心 JavaScript 邏輯 (包含 Firebase) -->
+    <!-- 核心 JavaScript 邏輯 (包含 Firebase v9+ Modular SDK) -->
     <script type="module">
+        // 導入 Firebase v9+ 模組
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { 
             getAuth, 
@@ -81,10 +98,10 @@
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         
         // --- Canvas 環境全域變數處理 (REQUIRED) ---
+        // 優先使用 Canvas 提供的配置，如果不存在則使用空物件（避免崩潰）
         const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'; 
-
+        
         let auth;
         
         // DOM 元素參考
@@ -96,56 +113,21 @@
         try {
             const app = initializeApp(firebaseConfig);
             auth = getAuth(app);
-            console.log("Firebase initialized successfully.");
+            console.log("Firebase v9 initialized successfully.");
 
             // 1. 設定認證狀態變更監聽器 (Listener)
             onAuthStateChanged(auth, user => {
                 if (user && !user.isAnonymous) {
                     // 只有當用戶使用正式帳號（非匿名）登入時才重定向
-                    console.log("User is logged in and authenticated, redirecting to trip.html");
-                    window.location.href = 'trip.html';
+                    console.log("User is logged in and authenticated, redirecting to trips.html");
+                    // 修正：重定向到您提供的 trips.html
+                    window.location.href = 'trips.html'; 
                 } else if (user && user.isAnonymous) {
                     console.log("User is signed in anonymously, staying on index.html for manual login.");
-    // IMPORTANT: Set debug level for firestore
-    setLogLevel('Debug');
-
-    let db;
-    let auth;
-    let userId = null;
-    let unsubscribe = null; // 用於儲存實時監聽器的取消函數
-
-    const loadingSpinner = document.getElementById('loading-spinner');
-    const itineraryList = document.getElementById('itinerary-list');
-    const emptyState = document.getElementById('empty-state');
-    
-    // --- 1. Firebase 初始化與身份驗證 ---
-    const initializeFirebase = async () => {
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-        const app = initializeApp(firebaseConfig);
-        db = getFirestore(app);
-        auth = getAuth(app);
-
-        try {
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                await signInWithCustomToken(auth, __initial_auth_token);
-                console.log("Signed in with custom token.");
-            } else {
-                await signInAnonymously(auth);
-                console.log("Signed in anonymously.");
-            }
-
-            onAuthStateChanged(auth, (user) => {
-                if (user) {
-                    userId = user.uid;
-                    console.log("User authenticated. UID:", userId);
-                    // 身份驗證完成後，開始監聽資料
-                    startListeningToItineraries();
                 } else {
-                    console.error("Authentication failed. Cannot proceed with Firestore operations.");
-                    loadingSpinner.innerHTML = '<p class="text-red-600">載入失敗：請重新整理頁面進行身份驗證。</p>';
+                    console.log("No user logged in, staying on index.html.");
                 }
             });
-
             
             // 2. 執行強制初始認證 (Canvas REQUIREMENT)
             async function performInitialAuth() {
@@ -154,76 +136,41 @@
                         await signInWithCustomToken(auth, initialAuthToken);
                         console.log("Signed in with custom token.");
                     } else {
-                        // 如果沒有提供 Custom Token，則匿名登入
+                        // 如果沒有提供 Custom Token，則匿名登入以啟動 Auth 服務
                         await signInAnonymously(auth);
                         console.log("Signed in anonymously.");
                     }
                 } catch (e) {
                     console.error("Initial auth failed:", e);
+                    // 初始認證失敗通常是暫時的，onAuthStateChanged 會處理後續
                 }
             }
             performInitialAuth();
             
         } catch (error) {
-            console.error("Firebase Auth Error:", error);
-            loadingSpinner.innerHTML = `<p class="text-red-600">Firebase 初始化錯誤: ${error.message}</p>`;
-        }
-    };
-    
-    // --- 2. 渲染行程清單 ---
-    const renderItineraries = (itineraries) => {
-        itineraryList.innerHTML = ''; // 清空現有清單
-        
-        if (itineraries.length === 0) {
-            itineraryList.classList.add('hidden');
-            emptyState.classList.remove('hidden');
-            loadingSpinner.classList.add('hidden'); // 確保載入指示器被隱藏
-            return;
+            console.error("Firebase 初始化失敗:", error);
+            showError(`Firebase 初始化失敗: ${error.message}`);
         }
 
-        // 隱藏載入中和空白狀態，顯示清單
-        loadingSpinner.classList.add('hidden');
-        emptyState.classList.add('hidden');
-        itineraryList.classList.remove('hidden');
-        
-        // 將行程按日期時間排序
-        itineraries.sort((a, b) => {
-            const dateA = new Date(`${a.date}T${a.time || '00:00'}`);
-            const dateB = new Date(`${b.date}T${b.time || '00:00'}`);
-            return dateA - dateB;
-        });
+        // --- UI 輔助函數 ---
 
-        itineraries.forEach(item => {
-            const itemElement = document.createElement('div');
-            itemElement.className = 'itinerary-item p-4 flex justify-between items-center cursor-pointer';
-            
-            // 點擊項目時導航到編輯頁面
-            itemElement.addEventListener('click', () => {
-                // 導航到 itinerary_edit.html
-                window.location.href = `itinerary_edit.html?id=${item.id}`;
-            });
+        /**
+         * 顯示錯誤訊息
+         */
+        function showError(message) {
+            authError.textContent = message;
+            authError.style.display = 'block';
+            submitButton.disabled = false;
+            submitButton.innerHTML = '<i class="fas fa-sign-in-alt mr-2"></i> 登入';
+        }
 
-            const content = `
-                <div>
-                    <p class="text-lg font-semibold text-gray-800">${item.name}</p>
-                    <p class="text-sm text-gray-500">
-                        ${item.date} 
-                        ${item.time ? ' @ ' + item.time : ''}
-                        ${item.location ? ' - ' + item.location : ''}
-                    </p>
-                    ${item.notes ? `<p class="text-xs text-gray-400 mt-1 truncate max-w-sm">${item.notes}</p>` : ''}
-                </div>
-                <!-- 編輯圖標 (僅裝飾，點擊由父層處理) -->
-                <svg class="w-5 h-5 text-blue-500 hover:text-blue-700 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-            `;
-            itemElement.innerHTML = content;
-            itineraryList.appendChild(itemElement);
-        });
-    };
-    
-    // --- 3. 實時監聽 Firestore 資料 ---
-    const startListeningToItineraries = () => {
-        if (!userId) return;
+        /**
+         * 處理登入操作
+         */
+        async function handleLogin() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
             // 清除之前的錯誤訊息
             authError.style.display = 'none';
 
@@ -239,7 +186,7 @@
             try {
                 // 使用模組化 SDK 的登入函數
                 await signInWithEmailAndPassword(auth, email, password);
-                // 成功登入，onAuthStateChanged 會自動檢查並導向 trip.html
+                // 成功登入，onAuthStateChanged 會自動檢查並導向 trips.html
                 // 不需要在這裡手動重定向
             } catch (error) {
                 console.error("登入失敗:", error);
@@ -247,6 +194,7 @@
                 switch (error.code) {
                     case 'auth/user-not-found':
                     case 'auth/wrong-password':
+                    case 'auth/invalid-credential': // v9+ 的常見錯誤碼
                         errorMessage = '電子郵件或密碼錯誤，請重新輸入。';
                         break;
                     case 'auth/invalid-email':
@@ -260,40 +208,5 @@
         }
         window.handleLogin = handleLogin;
     </script>
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const collectionPath = `artifacts/${appId}/users/${userId}/itineraries`;
-        const q = query(collection(db, collectionPath));
-
-        // 如果之前有監聽器，先取消它
-        if (unsubscribe) {
-            unsubscribe();
-        }
-
-        // onSnapshot 設置實時監聽
-        unsubscribe = onSnapshot(q, (snapshot) => {
-            const itineraries = [];
-            snapshot.forEach((doc) => {
-                itineraries.push({ id: doc.id, ...doc.data() });
-            });
-            console.log("Data snapshot received. Items:", itineraries.length);
-            renderItineraries(itineraries);
-        }, (error) => {
-            console.error("Error listening to Firestore:", error);
-            loadingSpinner.innerHTML = `<p class="text-red-600">資料庫連線錯誤: ${error.message}</p>`;
-        });
-    };
-    
-    // --- 4. 初始化事件監聽器 ---
-    const initializePageEvents = () => {
-        document.getElementById('add-itinerary-btn').addEventListener('click', () => {
-            // 導航到新增/編輯頁面
-            window.location.href = 'itinerary_edit.html';
-        });
-    };
-    
-    // 啟動應用程式
-    initializePageEvents();
-    initializeFirebase();
-</script>
 </body>
 </html>
