@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>編輯行程 | 關西規劃 App</title>
+    <!-- 引入 Tailwind CSS 3.x -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    
+    <!-- 引入 Firebase SDK v8 -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+
+    <style>
+        body {
+            font-family: "Noto Sans CJK TC", "Inter", sans-serif;
+            min-height: 100vh;
+            background-color: #f7f9fb;
+        }
+        .kobe-osaka-blue {
+            background: linear-gradient(145deg, #1e40af 0%, #3b82f6 100%);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 頂部標題和返回按鈕 -->
+    <header class="sticky top-0 z-10 w-full kobe-osaka-blue text-white p-4 shadow-lg rounded-b-xl">
+        <div class="flex justify-start items-center max-w-4xl mx-auto">
+            <button onclick="goBack()" class="mr-4 text-white hover:text-gray-200 transition">
+                <i class="fas fa-arrow-left fa-lg"></i>
+            </button>
+            <h1 class="text-xl font-bold" id="page-title">新增行程日</h1>
+        </div>
+    </header>
+
+    <!-- 主內容區：編輯表單 -->
+    <main class="container mx-auto p-4 max-w-3xl">
+        <div class="bg-white p-6 sm:p-8 rounded-xl shadow-lg border border-gray-100">
+            
+            <div id="form-status" class="mb-4" style="display: none;">
+                <!-- 狀態/錯誤訊息 -->
+            </div>
+
+            <form id="edit-day-form" onsubmit="event.preventDefault(); submitDayForm()">
+                <div class="space-y-6">
+                    <!-- Day 數字輸入 -->
+                    <div>
+                        <label for="day-num-input" class="block text-sm font-medium text-gray-700 mb-1">Day 數字 (例如: 3)</label>
+                        <input type="number" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" id="day-num-input" required min="1" placeholder="輸入 Day 數字">
+                        <p id="day-num-help" class="mt-1 text-xs text-gray-500">這將決定行程的排序。編輯模式下無法修改。</p>
+                    </div>
+                    
+                    <!-- 地點名稱輸入 -->
+                    <div>
+                        <label for="location-input" class="block text-sm font-medium text-gray-700 mb-1">地點名稱</label>
+                        <input type="text" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" id="location-input" required placeholder="例如: 環球影城">
+                    </div>
+
+                    <!-- 區域 (城市) 輸入 -->
+                    <div>
+                        <label for="area-input" class="block text-sm font-medium text-gray-700 mb-1">區域 (城市)</label>
+                        <input type="text" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" id="area-input" required placeholder="例如: 大阪">
+                    </div>
+
+                    <!-- 詳細描述/注意事項 -->
+                    <div>
+                        <label for="description-input" class="block text-sm font-medium text-gray-700 mb-1">詳細描述 / 注意事項</label>
+                        <textarea class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" id="description-input" rows="7" placeholder="例如: 早上搭車，中午玩哈利波特區，晚餐吃居酒屋..."></textarea>
+                    </div>
+                </div>
+
+                <!-- 提交按鈕群組 -->
+                <div class="flex justify-end space-x-3 mt-8 border-t pt-6">
+                    <button type="button" onclick="goBack()" class="bg-gray-200 text-gray-700 hover:bg-gray-300 px-6 py-3 rounded-xl font-semibold transition">
+                        <i class="fas fa-times mr-1"></i> 取消
+                    </button>
+                    <button type="submit" id="submit-button" class="kobe-osaka-blue text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition duration-300 active:scale-98">
+                        <i class="fas fa-save mr-1"></i> 儲存行程
+                    </button>
+                </div>
+            </form>
+        </div>
+    </main>
+
+    <!-- 核心 JavaScript 邏輯 (包含 Firebase) -->
+    <script>
+        // *** 請使用您專案的真實 Firebase Config ***
+        const firebaseConfig = {
+            apiKey: "AIzaSyBsMiLUgtTcv48iRp_9QFx5fShtRd6Lro", 
+            authDomain: "kobe-osaka-2026travel.firebaseapp.com",
+            projectId: "kobe-osaka-2026travel",
+            storageBucket: "kobe-osaka-2026travel.firebasestorage.app",
+            messagingSenderId: "772246724994",
+            appId: "1:772246724994:web:26c067ae1096d13ebdef9b"
+        };
+        
+        let db;
+        let auth;
+        let currentDocId = null; 
+        let isEditMode = false;
+
+        // DOM 元素參考
+        const pageTitle = document.getElementById('page-title');
+        const dayNumInput = document.getElementById('day-num-input');
+        const locationInput = document.getElementById('location-input');
+        const descriptionInput = document.getElementById('description-input');
+        const areaInput = document.getElementById('area-input');
+        const submitButton = document.getElementById('submit-button');
+        const formStatus = document.getElementById('form-status');
+        const dayNumHelp = document.getElementById('day-num-help');
+
+        // 1. 初始化 Firebase 服務
+        try {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            auth = firebase.auth();
+        } catch (error) {
+            console.error("Firebase 初始化失敗:", error);
+            showStatus('Firebase 初始化失敗。請檢查 config 設定。', 'error');
+        }
+
+        /**
+         * 顯示狀態/錯誤訊息
+         */
+        function showStatus(message, type = 'success') {
+            formStatus.style.display = 'block';
+            formStatus.innerHTML = `<div class="p-3 rounded-lg ${type === 'error' ? 'bg-red-100 text-red-700 border border-red-400' : 'bg-green-100 text-green-700 border border-green-400'}"><i class="fas ${type === 'error' ? 'fa-times-circle' : 'fa-check-circle'} mr-2"></i>${message}</div>`;
+        }
+        
+        /**
+         * 從 URL 獲取參數
+         */
+        function getUrlParams() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('docId');
+        }
+        
+        /**
+         * 返回檢視頁面
+         */
+        function goBack() {
+            window.location.href = 'itinerary_view.html';
+        }
+        window.goBack = goBack;
+
+        /**
+         * 載入單一行程資料 (編輯模式)
+         */
+        async function loadItineraryData(docId) {
+            submitButton.disabled = true;
+            submitButton.innerHTML = `<i class="fas fa-spinner fa-spin mr-1"></i> 載入中...`;
+
+            try {
+                const docRef = db.collection("itinerary").doc(docId);
+                const doc = await docRef.get();
+
+                if (doc.exists) {
+                    const data = doc.data();
+                    // 填充表單
+                    locationInput.value = data.location || '';
+                    descriptionInput.value = data.description || '';
+                    areaInput.value = data.area || '';
+                    dayNumInput.value = docId.match(/Day(\d+)/i)?.[1] || '';
+                    
+                    dayNumInput.disabled = true; // 編輯模式下 Day 數字不可修改
+                    dayNumHelp.textContent = '此為編輯模式，Day 數字不可修改。';
+                    
+                    pageTitle.textContent = `編輯行程：${docId}`;
+                    submitButton.textContent = '儲存變更';
+                } else {
+                    showStatus(`找不到文件 ID: ${docId}`, 'error');
+                    setTimeout(goBack, 3000); 
+                }
+            } catch (error) {
+                console.error("載入行程資料失敗:", error);
+                showStatus(`載入行程失敗: ${error.message}`, 'error');
+            } finally {
+                submitButton.disabled = false;
+                submitButton.innerHTML = `<i class="fas fa-save mr-1"></i> 儲存變更`;
+            }
+        }
+        
+        /**
+         * 處理表單提交：新增或更新行程
+         */
+        async function submitDayForm() {
+            const dayNum = dayNumInput.value.trim();
+            const location = locationInput.value.trim();
+            const description = descriptionInput.value.trim();
+            const area = areaInput.value.trim();
+
+            if (!dayNum || isNaN(parseInt(dayNum)) || parseInt(dayNum) < 1 || !location || !area) {
+                showStatus('請確保所有欄位都已正確填寫 (Day 數字必須大於 0)。', 'error');
+                return;
+            }
+            
+            const docId = `Day${dayNum}`; 
+            
+            // 啟用載入狀態
+            const originalButtonText = submitButton.textContent;
+            submitButton.disabled = true;
+            submitButton.innerHTML = `<i class="fas fa-spinner fa-spin mr-2"></i> ${isEditMode ? '儲存中...' : '新增中...'}`;
+
+            const newDayData = {
+                location: location,
+                description: description,
+                area: area,
+                createdAt: isEditMode ? undefined : firebase.firestore.FieldValue.serverTimestamp(), 
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            
+            try {
+                // 使用 setDoc({ merge: true }) 處理新增或更新
+                await db.collection("itinerary").doc(docId).set(newDayData, { merge: true });
+
+                showStatus(`行程 **${docId}** ${isEditMode ? '更新' : '新增'}成功！正在返回檢視頁...`, 'success');
+                setTimeout(goBack, 1500); // 1.5秒後返回檢視頁
+
+            } catch (error) {
+                console.error("新增/更新行程失敗:", error);
+                showStatus(`操作失敗: ${error.message}。請確認 Firestore 寫入權限 (Rules)。`, 'error');
+                submitButton.disabled = false;
+                submitButton.innerHTML = originalButtonText;
+            } 
+        }
+        window.submitDayForm = submitDayForm;
+
+
+        // 2. 監聽 Firebase 身份驗證狀態變化並初始化頁面
+        auth.onAuthStateChanged((user) => {
+            if (!user) {
+                // 若未登入，強制導向登入頁
+                window.location.href = 'index.html';
+                return; 
+            }
+            
+            // 處理編輯或新增模式
+            const docIdFromUrl = getUrlParams();
+            if (docIdFromUrl) {
+                currentDocId = docIdFromUrl;
+                isEditMode = true;
+                loadItineraryData(currentDocId);
+            } else {
+                // 新增模式
+                isEditMode = false;
+                pageTitle.textContent = '新增行程日';
+                submitButton.textContent = '新增行程';
+                dayNumInput.disabled = false;
+                dayNumHelp.textContent = '這將決定行程的排序。請輸入不重複的 Day 數字。';
+            }
+        });
+    </script>
+</body>
+</html>
