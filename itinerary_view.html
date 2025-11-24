@@ -3,320 +3,204 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>行程檢視 | 關西規劃 App</title>
-    <!-- 引入 Tailwind CSS 3.x -->
+    <title>我的行程清單</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入 Bootstrap 5 JS Bundle (僅用於 Modal 彈窗) -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
-    <!-- 引入 Font Awesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
-    
-    <!-- 引入 Firebase SDK v8 -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
         body {
-            font-family: "Noto Sans CJK TC", "Inter", sans-serif;
-            min-height: 100vh;
+            font-family: 'Inter', sans-serif;
             background-color: #f7f9fb;
         }
-        main {
-            padding-bottom: 6rem; /* 為底部導航欄保留空間 */
+        .container-card {
+            max-width: 800px;
+            margin: 2rem auto;
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
         }
-        .kobe-osaka-blue {
-            background: linear-gradient(145deg, #1e40af 0%, #3b82f6 100%);
+        .itinerary-item {
+            border-bottom: 1px solid #e2e8f0;
+            transition: background-color 0.15s;
         }
-        .day-card {
-            transition: transform 0.2s, box-shadow 0.2s;
+        .itinerary-item:last-child {
+            border-bottom: none;
         }
-        .day-card:active {
-            transform: scale(0.98);
+        .itinerary-item:hover {
+            background-color: #f9fafb;
         }
     </style>
 </head>
 <body>
 
-    <!-- 頂部標題和使用者狀態 -->
-    <header class="sticky top-0 z-10 w-full kobe-osaka-blue text-white p-4 shadow-lg rounded-b-xl">
-        <div class="flex justify-between items-center max-w-4xl mx-auto">
-            <h1 class="text-xl font-bold flex items-center">
-                <i class="fas fa-route mr-2"></i> 關西五日遊
-            </h1>
-            <span class="text-sm opacity-80" id="user-status">行程列表</span>
-        </div>
-    </header>
-
-    <!-- 主內容區 -->
-    <main class="container mx-auto p-4 max-w-4xl">
-        
-        <!-- 訊息/狀態區 -->
-        <div id="itinerary-status" class="text-center p-6 text-gray-500 loading-state">
-            <i class="fas fa-spinner fa-spin mr-2"></i> 正在檢查登入狀態...
-        </div>
-
-        <!-- 行程卡片列表 -->
-        <div id="itinerary-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <!-- 行程資料將渲染於此 -->
-        </div>
-    </main>
-
-    <!-- 底部固定導航欄 (Mobile App 菜單) -->
-    <nav class="fixed bottom-0 left-0 right-0 h-24 bg-white shadow-2xl z-20 rounded-t-2xl border-t border-gray-100">
-        <div class="flex justify-around items-center h-full max-w-md mx-auto">
-            
-            <!-- 1. 新增行程按鈕 (FAB 樣式) -->
-            <!-- 導向編輯頁面 (無 docId 參數，表示新增) -->
-            <button class="bg-indigo-600 hover:bg-indigo-700 text-white p-4 rounded-full shadow-lg transform translate-y-[-50%] transition duration-200 active:scale-95 focus:outline-none" 
-                    title="新增行程"
-                    onclick="window.location.href='itinerary_edit.html'">
-                <i class="fas fa-plus fa-2x"></i>
-            </button>
-
-            <!-- 2. 功能頁面連結 (可選) -->
-            <a href="#" class="flex flex-col items-center text-gray-600 hover:text-indigo-600 transition">
-                <i class="fas fa-cogs text-xl"></i>
-                <span class="text-xs mt-1">其他功能</span>
-            </a>
-
-            <!-- 3. 登出按鈕 -->
-            <button class="flex flex-col items-center text-gray-600 hover:text-red-600 transition" 
-                    onclick="handleLogout()"
-                    title="登出">
-                <i class="fas fa-sign-out-alt text-xl"></i>
-                <span class="text-xs mt-1">登出</span>
-            </button>
-        </div>
-    </nav>
-
-
-    <!-- 行程詳細檢視 Modal -->
-    <div class="modal fade" id="day-detail-modal" tabindex="-1" aria-labelledby="detail-modal-title" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content rounded-xl shadow-2xl">
-                <div class="modal-header kobe-osaka-blue text-white border-b border-indigo-300">
-                    <h5 class="modal-title font-extrabold" id="detail-modal-title">行程詳細資訊</h5>
-                    <button type="button" class="text-white opacity-70 hover:opacity-100" data-bs-dismiss="modal" aria-label="Close">
-                         <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div class="modal-body p-6">
-                    <div class="space-y-4">
-                        <div class="flex items-center">
-                            <dt class="w-1/4 font-semibold text-gray-600 flex items-center"><i class="fas fa-map-pin mr-2 text-indigo-500"></i> 地點</dt>
-                            <dd class="w-3/4"><h4 id="detail-location" class="text-xl font-bold text-gray-800"></h4></dd>
-                        </div>
-
-                        <div class="flex items-center">
-                            <dt class="w-1/4 font-semibold text-gray-600 flex items-center"><i class="fas fa-city mr-2 text-indigo-500"></i> 區域</dt>
-                            <dd class="w-3/4"><p id="detail-area" class="text-gray-600"></p></dd>
-                        </div>
-
-                        <div class="pt-4 border-t border-gray-100">
-                            <dt class="font-semibold text-gray-600 flex items-center mb-2"><i class="fas fa-scroll mr-2 text-indigo-500"></i> 詳細行程與注意事項</dt>
-                            <dd>
-                                <div id="detail-description" class="p-4 border border-indigo-100 rounded-lg bg-indigo-50 text-gray-700 whitespace-pre-wrap"></div>
-                            </dd>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer flex justify-between p-4 border-t border-gray-200">
-                    <!-- 編輯按鈕：導向 itinerary_edit.html?docId=... -->
-                    <button type="button" class="bg-yellow-500 text-white hover:bg-yellow-600 px-4 py-2 rounded-lg shadow-md transition" id="detail-edit-button">
-                        <i class="fas fa-edit mr-1"></i> 編輯此行程
-                    </button>
-                    <!-- 地圖連結 -->
-                    <a href="#" id="map-button" class="bg-blue-500 text-white hover:bg-blue-600 px-4 py-2 rounded-lg shadow-md transition" target="_blank" rel="noopener noreferrer">
-                        <i class="fas fa-globe mr-1"></i> 查看地圖 (Google Maps)
-                    </a>
-                    <button type="button" class="bg-gray-200 text-gray-700 hover:bg-gray-300 px-4 py-2 rounded-lg" data-bs-dismiss="modal">關閉</button>
-                </div>
-            </div>
-        </div>
+<div class="container-card">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold text-gray-900">我的行程</h1>
+        <button id="add-itinerary-btn" class="flex items-center px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition duration-150 shadow-md">
+            <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+            新增行程
+        </button>
     </div>
 
-    <!-- 核心 JavaScript 邏輯 (包含 Firebase) -->
-    <script>
-        // *** 請使用您專案的真實 Firebase Config ***
-        const firebaseConfig = {
-            apiKey: "AIzaSyBsMiLUgtTcv48iRp_9QFx5fShtRd6Lro", // 保持範例金鑰，但請替換為真實的
-            authDomain: "kobe-osaka-2026travel.firebaseapp.com",
-            projectId: "kobe-osaka-2026travel",
-            storageBucket: "kobe-osaka-2026travel.firebasestorage.app",
-            messagingSenderId: "772246724994",
-            appId: "1:772246724994:web:26c067ae1096d13ebdef9b"
-        };
+    <div id="loading-spinner" class="text-center py-10">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 inline-block"></div>
+        <p class="mt-2 text-gray-500">正在載入行程資料...</p>
+    </div>
 
-        // DOM 元素參考
-        const itineraryList = document.getElementById('itinerary-list');
-        const itineraryStatus = document.getElementById('itinerary-status');
-        
-        let db;
-        let auth;
-        let unsubscribe = null; 
-        let detailModalInstance; // 詳細檢視 Modal 實例
+    <div id="itinerary-list" class="space-y-0 border border-gray-200 rounded-lg overflow-hidden hidden">
+        <!-- 行程項目將由 JavaScript 渲染到這裡 -->
+    </div>
+    
+    <div id="empty-state" class="text-center py-10 hidden">
+        <svg class="w-12 h-12 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+        <h3 class="mt-2 text-sm font-medium text-gray-900">尚未新增任何行程</h3>
+        <p class="mt-1 text-sm text-gray-500">點擊上方按鈕開始規劃您的旅程！</p>
+    </div>
 
-        // 1. 初始化 Firebase 服務
+</div>
+
+<!-- Firebase Modules -->
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, query, onSnapshot, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // IMPORTANT: Set debug level for firestore
+    setLogLevel('Debug');
+
+    let db;
+    let auth;
+    let userId = null;
+    let unsubscribe = null; // 用於儲存實時監聽器的取消函數
+
+    const loadingSpinner = document.getElementById('loading-spinner');
+    const itineraryList = document.getElementById('itinerary-list');
+    const emptyState = document.getElementById('empty-state');
+    
+    // --- 1. Firebase 初始化與身份驗證 ---
+    const initializeFirebase = async () => {
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
+
         try {
-            firebase.initializeApp(firebaseConfig);
-            db = firebase.firestore();
-            auth = firebase.auth();
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                await signInWithCustomToken(auth, __initial_auth_token);
+                console.log("Signed in with custom token.");
+            } else {
+                await signInAnonymously(auth);
+                console.log("Signed in anonymously.");
+            }
+
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    userId = user.uid;
+                    console.log("User authenticated. UID:", userId);
+                    // 身份驗證完成後，開始監聽資料
+                    startListeningToItineraries();
+                } else {
+                    console.error("Authentication failed. Cannot proceed with Firestore operations.");
+                    loadingSpinner.innerHTML = '<p class="text-red-600">載入失敗：請重新整理頁面進行身份驗證。</p>';
+                }
+            });
+
         } catch (error) {
-            console.error("Firebase 初始化失敗:", error);
-            itineraryStatus.innerHTML = '<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg"><i class="fas fa-times-circle mr-2"></i> Firebase 初始化失敗。請檢查您的 config 設定。</div>';
+            console.error("Firebase Auth Error:", error);
+            loadingSpinner.innerHTML = `<p class="text-red-600">Firebase 初始化錯誤: ${error.message}</p>`;
         }
-
-        /**
-         * 處理行程資料的實時監聽與渲染
-         */
-        function startItineraryListener() {
-            if (unsubscribe) {
-                unsubscribe();
-            }
-
-            itineraryStatus.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> 正在從 Firestore 載入行程...';
-            itineraryList.innerHTML = '';
-
-            // 實時監聽 'itinerary' 集合，並依文件 ID (DayX) 排序
-            unsubscribe = db.collection("itinerary").orderBy(firebase.firestore.FieldPath.documentId(), "asc")
-                .onSnapshot((querySnapshot) => {
-                    itineraryList.innerHTML = ''; 
-                    itineraryStatus.innerHTML = ''; // 清除 loading 狀態
-                    
-                    if (querySnapshot.empty) {
-                        itineraryStatus.innerHTML = '<div class="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded-lg"><i class="fas fa-exclamation-triangle mr-2"></i> 目前沒有行程。點擊底部 <i class="fas fa-plus"></i> 開始規劃！</div>';
-                        return;
-                    }
-
-                    querySnapshot.forEach((doc) => {
-                        const data = doc.data();
-                        const docId = doc.id;
-                        
-                        const dayMatch = docId.match(/Day(\d+)/i);
-                        const dayDisplay = dayMatch ? `DAY ${dayMatch[1]}` : docId.toUpperCase();
-
-                        // 確保資料是 HTML 安全的
-                        const safeLocation = (data.location || '地點未定').replace(/'/g, '&#39;');
-                        const safeDescription = (data.description || '點擊查看詳細描述...').replace(/'/g, '&#39;');
-                        const safeArea = (data.area || '關西地區').replace(/'/g, '&#39;');
-
-                        const cardHtml = `
-                            <div class="day-card bg-white p-5 rounded-xl shadow-lg border-l-4 border-indigo-400 relative overflow-hidden cursor-pointer" 
-                                onclick="openDayDetailModal('${docId}', '${safeLocation}', '${safeDescription}', '${safeArea}')">
-                                
-                                <!-- 刪除按鈕 (絕對定位) -->
-                                <button class="delete-btn absolute top-3 right-3 text-red-500 hover:text-red-700 z-10 p-1 bg-white rounded-full transition" 
-                                    onclick="event.stopPropagation(); deleteDay('${docId}')" title="刪除行程">
-                                    <i class="fas fa-trash-alt"></i>
-                                </button>
-                                
-                                <div class="day-marker text-indigo-700 font-extrabold text-3xl mb-1">${dayDisplay}</div>
-                                <h5 class="mt-2 text-2xl font-bold text-gray-900">${data.location || '地點未定'}</h5>
-                                <p class="text-sm text-gray-500 mb-4">${data.area || '關西地區'}</p>
-                                
-                                <!-- 摘要 -->
-                                <div class="flex items-center text-indigo-600 text-sm font-medium">
-                                    <i class="fas fa-info-circle mr-1"></i> ${data.description.substring(0, 25) + (data.description.length > 25 ? '...' : '') || '點擊查看詳細行程...'}
-                                </div>
-                            </div>
-                        `;
-                        itineraryList.innerHTML += cardHtml;
-                    });
-
-                }, (error) => {
-                    console.error("實時監聽資料失敗: ", error);
-                    itineraryStatus.innerHTML = `<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg"><i class="fas fa-lock mr-2"></i> 資料讀取失敗。原因：**權限不足** 或網路錯誤。</div>`;
-                });
-        }
-        window.startItineraryListener = startItineraryListener;
-
-        // --- 詳細檢視 (View) 函數 ---
-        function openDayDetailModal(docId, location, description, area) {
-            const detailModalTitle = document.getElementById('detail-modal-title');
-            const detailLocation = document.getElementById('detail-location');
-            const detailArea = document.getElementById('detail-area');
-            const detailDescription = document.getElementById('detail-description');
-            const mapButton = document.getElementById('map-button');
-            const editButton = document.getElementById('detail-edit-button');
-
-            // 1. 清理資料
-            const cleanedLocation = location.replace(/&#39;/g, "'");
-            const cleanedDescription = description.replace(/&#39;/g, "'");
-            const cleanedArea = area.replace(/&#39;/g, "'");
-
-            // 2. 填充 Modal 內容
-            detailModalTitle.textContent = `${docId.toUpperCase()} - ${cleanedLocation}`;
-            detailLocation.textContent = cleanedLocation;
-            detailArea.textContent = cleanedArea;
-            detailDescription.textContent = cleanedDescription; 
-
-            // 3. 地圖連結：建構 Google Maps 搜尋 URL
-            const searchQuery = `${cleanedLocation}, ${cleanedArea}, 神戶大阪`;
-            const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(searchQuery)}`;
-            mapButton.href = mapUrl;
-
-            // 4. 設定編輯按鈕：導向編輯頁面，並帶上 docId 參數
-            editButton.onclick = () => {
-                detailModalInstance.hide(); // 關閉檢視 Modal
-                window.location.href = `itinerary_edit.html?docId=${docId}`; 
-            };
-
-            // 5. 顯示 Modal
-            detailModalInstance.show();
-        }
-        window.openDayDetailModal = openDayDetailModal;
+    };
+    
+    // --- 2. 渲染行程清單 ---
+    const renderItineraries = (itineraries) => {
+        itineraryList.innerHTML = ''; // 清空現有清單
         
-        /**
-         * 刪除指定行程
-         */
-        function deleteDay(docId) {
-            // 使用自定義的 UI 替代 confirm()
-            if (!window.confirm(`您確定要刪除行程 ${docId} 嗎？此操作無法復原。`)) {
-                return;
-            }
-
-            db.collection("itinerary").doc(docId).delete().then(() => {
-                itineraryStatus.innerHTML = `<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mt-4"><i class="fas fa-trash-alt mr-2"></i> 行程 **${docId}** 刪除成功！</div>`;
-                setTimeout(() => itineraryStatus.innerHTML = '', 4000); 
-            }).catch((error) => {
-                console.error("刪除行程失敗:", error);
-                itineraryStatus.innerHTML = `<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mt-4">刪除行程失敗: ${error.message}。</div>`;
-            });
+        if (itineraries.length === 0) {
+            itineraryList.classList.add('hidden');
+            emptyState.classList.remove('hidden');
+            return;
         }
-        window.deleteDay = deleteDay; 
+
+        // 隱藏載入中和空白狀態，顯示清單
+        loadingSpinner.classList.add('hidden');
+        emptyState.classList.add('hidden');
+        itineraryList.classList.remove('hidden');
         
-        // --- 登入/登出邏輯 ---
-        function handleLogout() {
-            auth.signOut().then(() => {
-                // 登出成功後，導向登入頁
-                window.location.href = 'index.html'; 
-            }).catch((error) => {
-                console.error("登出失敗:", error);
-            });
-        }
-        window.handleLogout = handleLogout;
-
-
-        // 3. 監聽 Firebase 身份驗證狀態變化
-        auth.onAuthStateChanged((user) => {
-            if (user) {
-                document.getElementById('user-status').textContent = `已登入 (${user.uid.substring(0, 5)}...)`;
-                startItineraryListener();
-            } else {
-                // 若未登入，強制導向登入頁
-                window.location.href = 'index.html';
-            }
+        // 將行程按日期時間排序
+        itineraries.sort((a, b) => {
+            const dateA = new Date(`${a.date}T${a.time || '00:00'}`);
+            const dateB = new Date(`${b.date}T${b.time || '00:00'}`);
+            return dateA - dateB;
         });
 
-        // 初始化 Modal 實例
-        document.addEventListener('DOMContentLoaded', () => {
-            if (window.bootstrap && window.bootstrap.Modal) {
-                detailModalInstance = new bootstrap.Modal(document.getElementById('day-detail-modal'));
-            } else {
-                 console.error("Bootstrap Modal JS 載入失敗，詳細檢視彈窗將無法運作。");
-            }
+        itineraries.forEach(item => {
+            const itemElement = document.createElement('div');
+            itemElement.className = 'itinerary-item p-4 flex justify-between items-center cursor-pointer';
+            
+            // 點擊項目時導航到編輯頁面
+            itemElement.addEventListener('click', () => {
+                window.location.href = `itinerary_edit.html?id=${item.id}`;
+            });
+
+            const content = `
+                <div>
+                    <p class="text-lg font-semibold text-gray-800">${item.name}</p>
+                    <p class="text-sm text-gray-500">
+                        ${item.date} 
+                        ${item.time ? ' @ ' + item.time : ''}
+                        ${item.location ? ' - ' + item.location : ''}
+                    </p>
+                    ${item.notes ? `<p class="text-xs text-gray-400 mt-1 truncate max-w-sm">${item.notes}</p>` : ''}
+                </div>
+                <!-- 編輯圖標 (僅裝飾，點擊由父層處理) -->
+                <svg class="w-5 h-5 text-blue-500 hover:text-blue-700 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+            `;
+            itemElement.innerHTML = content;
+            itineraryList.appendChild(itemElement);
         });
-    </script>
+        
+        // 確保加載指示器被隱藏
+        loadingSpinner.classList.add('hidden');
+    };
+    
+    // --- 3. 實時監聽 Firestore 資料 ---
+    const startListeningToItineraries = () => {
+        if (!userId) return;
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const collectionPath = `artifacts/${appId}/users/${userId}/itineraries`;
+        const q = query(collection(db, collectionPath));
+
+        // 如果之前有監聽器，先取消它
+        if (unsubscribe) {
+            unsubscribe();
+        }
+
+        // onSnapshot 設置實時監聽
+        unsubscribe = onSnapshot(q, (snapshot) => {
+            const itineraries = [];
+            snapshot.forEach((doc) => {
+                itineraries.push({ id: doc.id, ...doc.data() });
+            });
+            console.log("Data snapshot received. Items:", itineraries.length);
+            renderItineraries(itineraries);
+        }, (error) => {
+            console.error("Error listening to Firestore:", error);
+            loadingSpinner.innerHTML = `<p class="text-red-600">資料庫連線錯誤: ${error.message}</p>`;
+        });
+    };
+    
+    // --- 4. 初始化事件監聽器 ---
+    const initializePageEvents = () => {
+        document.getElementById('add-itinerary-btn').addEventListener('click', () => {
+            // 導航到新增/編輯頁面
+            window.location.href = 'itinerary_edit.html';
+        });
+    };
+    
+    // 啟動應用程式
+    initializePageEvents();
+    initializeFirebase();
+</script>
 </body>
 </html>
