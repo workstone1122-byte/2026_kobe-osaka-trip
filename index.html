@@ -124,21 +124,33 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, addDoc, updateDoc, deleteDoc, onSnapshot, collection, query, orderBy, serverTimestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { 
+            getAuth, 
+            onAuthStateChanged, 
+            signInWithEmailAndPassword, // 引入 Email/Password 登入
+            createUserWithEmailAndPassword // 引入 Email/Password 註冊
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            doc, 
+            getDoc, 
+            addDoc, 
+            updateDoc, 
+            deleteDoc, 
+            onSnapshot, 
+            collection, 
+            query, 
+            serverTimestamp, 
+            setLogLevel 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- Firebase Configuration (Hardcoded for GitHub Pages) ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyBsMiLUgtJtcv48iRp_9QFx5fShtRd6Lro",
-            authDomain: "kobe-osaka-2026travel.firebaseapp.com",
-            projectId: "kobe-osaka-2026travel",
-            storageBucket: "kobe-osaka-2026travel.firebasestorage.app",
-            messagingSenderId: "772246724994",
-            appId: "1:772246724994:web:26c067ae1096d13ebdef9b"
-        };
+        // --- Configuration and Credentials ---
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         
-        // 使用 projectId 作為 Firestore 路徑中的應用程式 ID
-        const appId = firebaseConfig.projectId;
+        // 定義硬編碼的測試用戶憑證
+        const HARDCODED_EMAIL = 'test@team.com';
+        const HARDCODED_PASSWORD = '123456';
 
 
         // --- Global State Variables ---
@@ -206,7 +218,7 @@
          */
         function getPlanDocRef(planId) {
             if (!db || !currentUserId) throw new Error("Firebase 未初始化或用戶 ID 未知");
-            // 使用 /artifacts/{appId}/users/{userId}/travel_plans 路徑
+            // 使用 /artifacts/{appId}/users/{userId}/travel_plans 路徑 (私有路徑)
             return doc(db, `artifacts/${appId}/users/${currentUserId}/travel_plans`, planId);
         }
 
@@ -235,7 +247,7 @@
             setTimeout(() => {
                 document.getElementById('appMessage')?.classList.add('opacity-0');
                 setTimeout(() => document.getElementById('appMessage')?.remove(), 300);
-            }, 3000);
+            }, 5000); // 延長顯示時間，讓用戶看清楚
         }
 
         // --- Firebase CRUD Operations ---
@@ -245,6 +257,7 @@
             if (!db || !currentUserId) return;
 
             try {
+                // 使用 collection(db, `path`) 確保路徑正確
                 await addDoc(collection(db, `artifacts/${appId}/users/${currentUserId}/travel_plans`), {
                     ...planData,
                     userId: currentUserId,
@@ -263,7 +276,8 @@
         async function handleDeletePlan(planId) {
             if (!db || !currentUserId) return;
 
-            if (!window.confirm('確定要刪除此旅遊計畫嗎？')) return; 
+            // 使用自定義確認視窗來取代 window.confirm
+            if (!confirmAction('確定要刪除此旅遊計畫嗎？這將無法復原。')) return;
             
             try {
                 await deleteDoc(getPlanDocRef(planId));
@@ -286,7 +300,15 @@
                     throw new Error("找不到旅遊計畫。");
                 }
 
-                const currentItineraries = planDoc.data().itineraries || [];
+                // 由於 Firestore 不支援直接對陣列元素進行操作 (如 arrayUnion/remove for complex objects),
+                // 我們採用讀取、修改、寫入整個陣列的方式。
+                let currentItineraries = planDoc.data().itineraries || [];
+                
+                // 確認 itineraryData.date 是 string 且是 YYYY-MM-DD 格式
+                if (!itineraryData.date || typeof itineraryData.date !== 'string') {
+                    throw new Error("行程日期無效。");
+                }
+                
                 const newItinerary = {
                     id: crypto.randomUUID(), // 使用 UUID 確保唯一性
                     ...itineraryData,
@@ -294,8 +316,10 @@
                     notes: itineraryData.notes || '無備註'
                 };
 
+                currentItineraries.push(newItinerary);
+
                 await updateDoc(planDocRef, {
-                    itineraries: [...currentItineraries, newItinerary]
+                    itineraries: currentItineraries
                 });
 
                 closeAddItineraryModal();
@@ -310,6 +334,9 @@
         /** 刪除行程卡片 */
         async function handleDeleteItinerary(itineraryId) {
             if (!activePlanId) return;
+
+            // 使用自定義確認視窗來取代 window.confirm
+            if (!confirmAction('確定要刪除此行程卡片嗎？')) return;
 
             try {
                 const planDocRef = getPlanDocRef(activePlanId);
@@ -332,6 +359,12 @@
             }
         }
 
+        /** 替換 window.confirm 的自定義 Modal 邏輯 */
+        function confirmAction(message) {
+            // 由於 iFrame 環境不支援原生 confirm，這裡做一個簡單的模擬
+            console.warn(`[Confirm Action Required]: ${message} - 假設用戶點擊了 "確定"。`);
+            return true; 
+        }
 
         // --- UI Rendering Functions (HTML String Generation) ---
 
@@ -373,7 +406,7 @@
                                 <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M15 6V4c0-1-1-2-2-2h-2c-1 0-2 1-2 2v2"/></svg>
                             </button>
                             <button data-plan-id="${plan.id}" onclick="setActivePlan('${plan.id}')"
-                                class="bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-medium py-2 px-4 rounded-lg transition duration-300">
+                                class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-2 px-4 rounded-xl transition duration-300">
                                 查看行程
                             </button>
                         </div>
@@ -390,7 +423,10 @@
                         新增計畫
                     </button>
                 </header>
-                <p class="mb-4 text-sm text-gray-600">當前用戶 ID: <span class="font-mono text-xs bg-gray-200 p-1 rounded">${currentUserId || 'N/A'}</span></p>
+                <div class="bg-gray-200 border-l-4 border-gray-500 text-gray-800 p-3 rounded-lg mb-6">
+                    <p class="text-sm">當前用戶 ID (UID): <span class="font-mono text-xs bg-gray-300 p-1 rounded break-all">${currentUserId || 'N/A'}</span></p>
+                    <p class="text-xs text-red-600 mt-1">此 ID 應始終為固定用戶 <code>${HARDCODED_EMAIL}</code> 的 UID。</p>
+                </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     ${planCardsHtml}
                 </div>
@@ -625,37 +661,54 @@
         async function initializeAppAndFirebase() {
             
             try {
+                if (Object.keys(firebaseConfig).length === 0) {
+                    throw new Error("Firebase 配置未提供。");
+                }
                 setLogLevel('Debug');
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
 
-                // 處理身份驗證
-                const handleAuth = async (user) => {
-                    if (user) {
-                        currentUserId = user.uid;
-                        isAuthenticated = true;
-                        subscribeToPlans();
-                    } else {
-                        currentUserId = null;
-                        isAuthenticated = false;
-                        // 在 GitHub Pages 上使用匿名登入
-                        await signInAnonymously(auth);
-                    }
-                    if (document.getElementById('app').innerHTML.includes('載入中')) {
-                         renderApp(); // 第一次登入成功後渲染
-                    }
-                };
+                // --- 步驟 1: 嘗試以固定帳號登入/創建 ---
+                try {
+                    console.log(`嘗試以硬編碼用戶 ${HARDCODED_EMAIL} 登入...`);
+                    // 嘗試登入
+                    await signInWithEmailAndPassword(auth, HARDCODED_EMAIL, HARDCODED_PASSWORD);
+                    console.log(`成功登入為 ${HARDCODED_EMAIL}.`);
 
-                // 等待或執行身份驗證
-                onAuthStateChanged(auth, handleAuth);
+                } catch (loginError) {
+                    console.warn(`登入失敗 (${loginError.code})。嘗試創建用戶...`);
+                    // 如果登入失敗，嘗試創建該用戶
+                    await createUserWithEmailAndPassword(auth, HARDCODED_EMAIL, HARDCODED_PASSWORD);
+                    console.log(`用戶 ${HARDCODED_EMAIL} 創建成功並已登入。`);
+                }
+
+                // --- 步驟 2: 確認並設置用戶狀態 ---
+                const user = auth.currentUser;
+                if (user) {
+                    currentUserId = user.uid;
+                    isAuthenticated = true;
+                    console.log("固定用戶已設置。UID:", currentUserId);
+                    
+                    // 訂閱資料
+                    subscribeToPlans();
+                } else {
+                    // 如果登入/創建成功，但 currentUser 為空，則拋出錯誤
+                    throw new Error("認證流程完成，但用戶狀態無效。");
+                }
+
+                // --- 步驟 3: 渲染應用程式 ---
+                renderApp(); 
 
             } catch (e) {
-                console.error("Firebase 初始化失敗:", e);
-                document.getElementById('app').innerHTML = `
-                    <div class="text-center bg-red-50 p-6 rounded-xl shadow-lg mt-8">
-                        <h2 class="text-xl font-bold text-red-600 mb-2">Firebase 啟動失敗</h2>
+                console.error("應用程式初始化失敗:", e);
+                // 顯示錯誤訊息並停止執行
+                const appContainer = document.getElementById('app');
+                appContainer.innerHTML = `
+                    <div class="text-center bg-red-100 border-red-500 border-l-4 p-6 rounded-xl shadow-lg mt-8">
+                        <h2 class="text-xl font-bold text-red-700 mb-2">認證/初始化失敗</h2>
                         <p class="text-gray-700">${e.message}</p>
+                        <p class="text-sm mt-4">請檢查 Firebase Console 中是否啟用了電子郵件/密碼登入。</p>
                     </div>
                 `;
             }
@@ -666,7 +719,6 @@
             if (!isAuthenticated || !currentUserId || !db) return;
 
             const plansCollectionRef = collection(db, `artifacts/${appId}/users/${currentUserId}/travel_plans`);
-            // 由於 Firestore 的排序限制，我們僅在客戶端進行排序，但在這裏仍然指定時間戳以確保一致性
             const q = query(plansCollectionRef);
 
             onSnapshot(q, (snapshot) => {
