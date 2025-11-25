@@ -10,6 +10,8 @@
         /* 使用 Inter 字體以獲得更好的現代感 */
         body {
             font-family: 'Inter', sans-serif;
+            /* 確保 body 內容不會被 fixed 導覽列遮擋 */
+            transition: padding-bottom 0.3s;
         }
         /* 隱藏原生彈出式對話框，我們使用自定義 Modal */
         .modal-overlay {
@@ -21,17 +23,24 @@
             visibility: visible;
             opacity: 1;
         }
+        /* 導覽列開啟時的 padding */
+        body.has-nav {
+            padding-bottom: 4rem; /* 導覽列高度約 4rem (h-16) */
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
+    <!-- 應用程式主容器 -->
     <div id="app" class="p-4 sm:p-8">
-        <!-- 應用程式內容將由 JavaScript 動態插入 -->
         <div class="flex items-center justify-center min-h-screen">
             <p class="text-lg font-semibold text-indigo-600">載入中... 正在初始化 Firebase...</p>
         </div>
     </div>
 
-    <!-- Modal for Adding/Editing Plan -->
+    <!-- 底部導覽列容器 (由 JS 動態生成) -->
+    <div id="bottom-nav-container"></div> 
+
+    <!-- 新增/編輯計畫 Modal -->
     <div id="addPlanModal" class="modal-overlay fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 transform transition-all scale-100">
             <h2 id="modalTitle" class="text-2xl font-bold mb-4 text-indigo-700">新增旅遊計畫</h2>
@@ -70,11 +79,11 @@
         </div>
     </div>
     
-    <!-- Modal for Custom Confirmation/Alert -->
+    <!-- 確認/警告 Modal -->
     <div id="confirmModal" class="modal-overlay fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 transform transition-all scale-100">
             <h2 id="confirmTitle" class="text-xl font-bold mb-4 text-indigo-700">確認操作</h2>
-            <p id="confirmMessage" class="text-gray-700 mb-6">您確定要刪除此計畫嗎？</p>
+            <p id="confirmMessage" class="text-gray-700 mb-6">您確定要執行此操作嗎？</p>
             <div class="flex justify-end space-x-3">
                 <button type="button" id="confirmCancel"
                         class="px-4 py-2 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300 transition duration-150">
@@ -88,14 +97,13 @@
         </div>
     </div>
     
-    <!-- Toast Notification Container -->
+    <!-- Toast 通知容器 -->
     <div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
 
-    <!-- Modal for User Login (新增登入介面) -->
+    <!-- 登入 Modal -->
     <div id="loginModal" class="modal-overlay fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 transform transition-all scale-100">
             <h2 class="text-2xl font-bold mb-6 text-indigo-700 text-center">登入旅遊規劃器</h2>
-            <!-- 重新加入密碼提示 -->
             <p class="text-sm text-red-500 mb-4 text-center font-semibold">
                 請注意：測試密碼統一為 <code class="bg-red-100 p-1 rounded">123456</code>
             </p>
@@ -126,262 +134,110 @@
 
     <script type="module">
         // ----------------------------------------------------
-        // 1. Firebase 和全域設定 (Global Configurations)
+        // I. 全域狀態與設定 (Global State & Configuration)
         // ----------------------------------------------------
         
-        // 確保這些全域變數在 Canvas 環境中被正確定義和解析
-        const firebaseConfig = {
-        apiKey: "AIzaSyBsMiLUgtJtcv48iRp_9QFx5fShtRd6Lro",
-        authDomain: "kobe-osaka-2026travel.firebaseapp.com",
-        projectId: "kobe-osaka-2026travel",
-        storageBucket: "kobe-osaka-2026travel.firebasestorage.app",
-        messagingSenderId: "772246724994",
-        appId: "1:772246724994:web:26c067ae1096d13ebdef9b"
-        };
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-        // Firebase 服務實例
-        let app, db, auth;
-        let isAuthenticated = false;
-        let currentUserId = null;
-        let plans = []; // 旅遊計畫列表
-        let currentEditingPlan = null; // 當前編輯的計畫
-
-        // Modal 元素
-        const addPlanModal = document.getElementById('addPlanModal');
-        const planForm = document.getElementById('planForm');
-        const modalTitle = document.getElementById('modalTitle');
-        const planTitleInput = document.getElementById('planTitle');
-        const planDestinationInput = document.getElementById('planDestination');
-        const planDateInput = document.getElementById('planDate');
-        const planNotesInput = document.getElementById('planNotes');
-        const appContainer = document.getElementById('app');
-        
-        // 新增的登入 Modal 元素
-        const loginModal = document.getElementById('loginModal');
-        const loginForm = document.getElementById('loginForm');
-        const loginEmailSelect = document.getElementById('loginEmail');
-        const loginPasswordInput = document.getElementById('loginPassword');
-        const loginErrorDiv = document.getElementById('loginError');
-
         // 模組化 Firebase 導入
         import { initializeApp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { 
-            getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signInWithEmailAndPassword
+            getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { 
             getFirestore, collection, addDoc, setDoc, doc, deleteDoc, onSnapshot, query, serverTimestamp
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // 設定 Firebase 日誌級別
-        setLogLevel('debug');
-
-
-        // ----------------------------------------------------
-        // 2. Firebase 初始化與認證 (Initialization & Authentication)
-        // ----------------------------------------------------
-
-        /** 處理使用者登入 */
-        async function handleLogin(e) {
-            e.preventDefault();
-            loginErrorDiv.textContent = '';
-            loginErrorDiv.classList.add('hidden');
+        // 全域應用程式狀態 (State)
+        const State = {
+            app: null,
+            db: null,
+            auth: null,
+            isAuthenticated: false,
+            currentUserId: null,
+            plans: [], // 旅遊計畫列表
+            currentPage: 'plans', // 當前頁面狀態，預設為 'plans'
+            currentEditingPlan: null, // 當前編輯的計畫
             
-            const email = loginEmailSelect.value;
-            const password = loginPasswordInput.value;
-            
-            // 檢查電子郵件和密碼是否輸入
-            if (!email || !password) {
-                loginErrorDiv.textContent = '請選擇電子郵件並輸入密碼。';
-                loginErrorDiv.classList.remove('hidden');
-                return;
+            // 底部導覽列項目配置
+            navItems: [
+                { id: 'plans', icon: 'M12 2a10 10 0 100 20 10 10 0 000-20zM9 13l2 2 4-4', label: '我的行程' },
+                { id: 'favorites', icon: 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-.318-.318a4.5 4.5 0 00-6.364 0z', label: '收藏' },
+                { id: 'budget', icon: 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m0 0l-1 1h4.586a1 1 0 00.707-.293l1.713-1.713a1 1 0 011.414 0L19.707 19.3a1 1 0 001.414 0l1.414-1.414', label: '預算管理' },
+                { id: 'past', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', label: '過去行程' },
+                { id: 'logout', icon: 'M11 16l-4-4m0 0l4-4m-4 4h14m6-4a9 9 0 11-18 0 9 9 0 0118 0z', label: '登出', isAction: true },
+            ],
+            // DOM 元素快取
+            dom: {
+                appContainer: document.getElementById('app'),
+                body: document.body,
+                addPlanModal: document.getElementById('addPlanModal'),
+                confirmModal: document.getElementById('confirmModal'),
+                planForm: document.getElementById('planForm'),
+                loginModal: document.getElementById('loginModal'),
+                loginForm: document.getElementById('loginForm'),
+                modalTitle: document.getElementById('modalTitle'),
+                planTitleInput: document.getElementById('planTitle'),
+                planDestinationInput: document.getElementById('planDestination'),
+                planDateInput: document.getElementById('planDate'),
+                planNotesInput: document.getElementById('planNotes'),
+                loginEmailSelect: document.getElementById('loginEmail'),
+                loginPasswordInput: document.getElementById('loginPassword'),
+                loginErrorDiv: document.getElementById('loginError'),
+                bottomNavContainer: document.getElementById('bottom-nav-container'),
             }
+        };
 
-            // 這裡可以加上一個簡單的 UI 鎖定，避免重複點擊
-            const loginBtn = document.getElementById('loginBtn');
-            loginBtn.disabled = true;
-            loginBtn.textContent = '登入中...';
-
-
-            try {
-                // 執行 Firebase 電子郵件/密碼登入
-                await signInWithEmailAndPassword(auth, email, password);
-                
-                // 登入成功，onAuthStateChanged 會自動處理後續邏輯
-                showToast(`登入成功！歡迎 ${email}`, 'success');
-                // loginModal 將會被 onAuthStateChanged 隱藏
-                
-            } catch (error) {
-                console.error("登入失敗:", error);
-                let message = '登入失敗。請檢查電子郵件或密碼是否正確。';
-                
-                // 友善的錯誤訊息提示
-                if (error.code === 'auth/user-not-found') {
-                    message = '此使用者不存在。請確認帳號是否已在 Firebase Console 中建立。';
-                } else if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-                     message = '密碼錯誤。';
-                }
-                
-                loginErrorDiv.textContent = message;
-                loginErrorDiv.classList.remove('hidden');
-                showToast(`登入失敗: ${message}`, 'error');
-                
-            } finally {
-                loginBtn.disabled = false;
-                loginBtn.textContent = '登入';
-            }
-        }
-
-        /** 初始化 Firebase 服務並處理認證 */
-        async function initializeFirebase() {
-            try {
-                // 檢查 Firebase 配置是否包含 API Key，以避免「Key 遺失」的錯誤
-                if (!firebaseConfig || !firebaseConfig.apiKey) {
-                    throw new Error("Firebase 配置資訊不完整或缺少 apiKey。請確認系統已成功注入 __firebase_config 變數。");
-                }
-                
-                app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-
-                // 使用 onAuthStateChanged 監聽認證狀態
-                onAuthStateChanged(auth, async (user) => {
-                    if (user) {
-                        // 使用者已登入 (透過登入表單成功認證)
-                        currentUserId = user.uid;
-                        isAuthenticated = true;
-                        console.log("Firebase 認證成功。User ID:", currentUserId);
-                        
-                        // 隱藏登入介面並開始訂閱資料
-                        loginModal.classList.remove('open');
-                        subscribeToPlans();
-                    } else {
-                        // 未認證，顯示登入介面
-                        currentUserId = null;
-                        isAuthenticated = false;
-                        console.log("使用者未登入。顯示登入表單。");
-                        
-                        // 清除初始載入訊息並顯示登入 modal
-                        appContainer.innerHTML = '';
-                        loginModal.classList.add('open');
-                        renderApp(); // 渲染主頁面骨架
-                    }
-                });
-
-            } catch (e) {
-                console.error("Firebase 初始化失敗:", e);
-                // 顯示初始化錯誤訊息
-                renderAuthError(e); 
-            }
-        }
-
-        /** 訂閱旅遊計畫列表 */
-        function subscribeToPlans() {
-            // 只有在認證成功、取得 User ID 且 Firestore 實例存在時才執行
-            if (!isAuthenticated || !currentUserId || !db) return;
-
-            // 私人資料路徑: /artifacts/{appId}/users/{userId}/travel_plans
-            const plansCollectionRef = collection(db, `artifacts/${appId}/users/${currentUserId}/travel_plans`);
-            const q = query(plansCollectionRef);
-
-            onSnapshot(q, (snapshot) => {
-                plans = snapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data(),
-                })).sort((a, b) => {
-                    // 在客戶端按建立時間倒序排序
-                    const dateA = a.createdAt?.toDate() || new Date(0);
-                    const dateB = b.createdAt?.toDate() || new Date(0);
-                    return dateB - dateA;
-                });
-                
-                // 每次資料更新時，重新渲染 App
-                renderApp();
-            }, (err) => {
-                console.error("Firestore 訂閱錯誤:", err);
-                showToast(`資料庫連接失敗: ${err.message}`, 'error');
-                renderApp(); // 即使失敗也嘗試渲染
-            });
-        }
-
-        /** 儲存或更新旅遊計畫 */
-        async function savePlan(planData) {
-            if (!isAuthenticated || !currentUserId || !db) {
-                showToast('請先完成認證才能儲存資料。', 'error');
-                return;
-            }
-
-            const { id, title, destination, date, notes } = planData;
-            
-            const docData = {
-                title,
-                destination,
-                date,
-                notes,
-                updatedAt: serverTimestamp(),
-            };
-
-            try {
-                if (id) {
-                    // 更新現有文件
-                    const planDocRef = doc(db, `artifacts/${appId}/users/${currentUserId}/travel_plans`, id);
-                    await setDoc(planDocRef, docData, { merge: true });
-                    showToast('旅遊計畫已成功更新！', 'success');
-                } else {
-                    // 新增文件
-                    const plansCollectionRef = collection(db, `artifacts/${appId}/users/${currentUserId}/travel_plans`);
-                    // 新增文件時才加入 createdAt 欄位
-                    await addDoc(plansCollectionRef, { 
-                        ...docData, 
-                        createdAt: serverTimestamp(),
-                    });
-                    showToast('新的旅遊計畫已成功新增！', 'success');
-                }
-                closeModal();
-            } catch (e) {
-                console.error("儲存計畫失敗:", e);
-                showToast(`儲存計畫失敗: ${e.message}`, 'error');
-            }
-        }
-
-        /** 刪除旅遊計畫 */
-        function deletePlan(planId) {
-            showConfirmation('刪除計畫', '您確定要永久刪除此旅遊計畫嗎？此操作不可逆。', async () => {
-                if (!isAuthenticated || !currentUserId || !db) {
-                    showToast('認證無效，無法刪除資料。', 'error');
-                    return;
-                }
-                try {
-                    const planDocRef = doc(db, `artifacts/${appId}/users/${currentUserId}/travel_plans`, planId);
-                    await deleteDoc(planDocRef);
-                    showToast('旅遊計畫已刪除。', 'success');
-                } catch (e) {
-                    console.error("刪除計畫失敗:", e);
-                    showToast(`刪除計畫失敗: ${e.message}`, 'error');
-                }
-            });
-        }
-
+        // Canvas 環境變數
+        const firebaseConfig = {
+            apiKey: "AIzaSyBsMiLUgtJtcv48iRp_9QFx5fShtRd6Lro",
+            authDomain: "kobe-osaka-2026travel.firebaseapp.com",
+            projectId: "kobe-osaka-2026travel",
+            storageBucket: "kobe-osaka-2026travel.firebasestorage.app",
+            messagingSenderId: "772246724994",
+            appId: "1:772246724994:web:26c067ae1096d13ebdef9b"
+        };
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
         // ----------------------------------------------------
-        // 3. UI 互動與渲染 (UI Interaction & Rendering)
+        // II. UI 輔助函式 (UI Utility Functions)
         // ----------------------------------------------------
+
+        /** 顯示 Toast 通知 */
+        function showToast(message, type = 'info') {
+            const toastContainer = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            let bgColor, borderColor, textColor = 'text-white', icon;
+
+            switch (type) {
+                case 'success': bgColor = 'bg-green-500'; borderColor = 'border-green-700'; icon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>`; break;
+                case 'error': bgColor = 'bg-red-500'; borderColor = 'border-red-700'; icon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`; break;
+                case 'info': default: bgColor = 'bg-indigo-500'; borderColor = 'border-indigo-700'; icon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`; break;
+            }
+
+            toast.className = `p-4 ${bgColor} ${textColor} rounded-lg shadow-lg border-l-4 ${borderColor} transition-all transform ease-out duration-300 opacity-0 translate-x-full flex items-center space-x-3`;
+            toast.innerHTML = `${icon} <span class="font-medium text-sm">${message}</span>`;
+
+            toastContainer.appendChild(toast);
+            
+            setTimeout(() => { toast.classList.remove('opacity-0', 'translate-x-full'); }, 10);
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-x-full');
+                toast.addEventListener('transitionend', () => toast.remove());
+            }, 5000);
+        }
         
         /** 顯示自定義確認對話框 */
         function showConfirmation(title, message, onConfirm) {
-            const confirmModal = document.getElementById('confirmModal');
+            const confirmModal = State.dom.confirmModal;
             document.getElementById('confirmTitle').textContent = title;
             document.getElementById('confirmMessage').textContent = message;
 
             const confirmActionBtn = document.getElementById('confirmAction');
             const confirmCancelBtn = document.getElementById('confirmCancel');
 
-            // 清除舊的事件監聽器
             confirmActionBtn.onclick = null;
             confirmCancelBtn.onclick = null;
 
-            // 設定新的事件監聽器
             confirmActionBtn.onclick = () => {
                 onConfirm();
                 confirmModal.classList.remove('open');
@@ -392,208 +248,444 @@
 
             confirmModal.classList.add('open');
         }
-
-        /** 顯示 Toast 通知 */
-        function showToast(message, type = 'info') {
-            const toastContainer = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            
-            let bgColor = '';
-            let borderColor = '';
-            let textColor = 'text-white';
-            let icon = '';
-
-            switch (type) {
-                case 'success':
-                    bgColor = 'bg-green-500';
-                    borderColor = 'border-green-700';
-                    icon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>`;
-                    break;
-                case 'error':
-                    bgColor = 'bg-red-500';
-                    borderColor = 'border-red-700';
-                    icon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`;
-                    break;
-                case 'warning':
-                    bgColor = 'bg-yellow-500';
-                    borderColor = 'border-yellow-700';
-                    textColor = 'text-gray-800'; // 警告使用深色文字
-                    icon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>`;
-                    break;
-                case 'info':
-                default:
-                    bgColor = 'bg-indigo-500';
-                    borderColor = 'border-indigo-700';
-                    icon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`;
-                    break;
-            }
-
-            toast.className = `p-4 ${bgColor} ${textColor} rounded-lg shadow-lg border-l-4 ${borderColor} transition-all transform ease-out duration-300 opacity-0 translate-x-full flex items-center space-x-3`;
-            toast.innerHTML = `
-                ${icon}
-                <span class="font-medium text-sm">${message}</span>
-            `;
-
-            toastContainer.appendChild(toast);
-            
-            // 延遲後滑入
-            setTimeout(() => {
-                toast.classList.remove('opacity-0', 'translate-x-full');
-            }, 10);
-
-            // 延遲後滑出並移除
-            setTimeout(() => {
-                toast.classList.add('opacity-0', 'translate-x-full');
-                toast.addEventListener('transitionend', () => toast.remove());
-            }, 5000);
-        }
-
+        
         /** 開啟新增/編輯 Modal */
         function openModal(plan = null) {
-            currentEditingPlan = plan;
+            State.currentEditingPlan = plan;
             if (plan) {
-                modalTitle.textContent = '編輯旅遊計畫';
-                planTitleInput.value = plan.title || '';
-                planDestinationInput.value = plan.destination || '';
-                planDateInput.value = plan.date || '';
-                planNotesInput.value = plan.notes || '';
+                State.dom.modalTitle.textContent = '編輯旅遊計畫';
+                State.dom.planTitleInput.value = plan.title || '';
+                State.dom.planDestinationInput.value = plan.destination || '';
+                State.dom.planDateInput.value = plan.date || '';
+                State.dom.planNotesInput.value = plan.notes || '';
             } else {
-                modalTitle.textContent = '新增旅遊計畫';
-                planForm.reset();
+                State.dom.modalTitle.textContent = '新增旅遊計畫';
+                State.dom.planForm.reset();
             }
-            addPlanModal.classList.add('open');
+            State.dom.addPlanModal.classList.add('open');
         }
 
         /** 關閉新增/編輯 Modal */
         function closeModal() {
-            addPlanModal.classList.remove('open');
-            currentEditingPlan = null;
+            State.dom.addPlanModal.classList.remove('open');
+            State.currentEditingPlan = null;
         }
 
-        /** 渲染認證錯誤訊息 (用於 Firebase 初始化失敗時) */
-        function renderAuthError(e) {
-            appContainer.innerHTML = `
-                <div class="max-w-xl mx-auto text-center bg-red-100 border-red-500 border-l-4 p-6 rounded-xl shadow-lg mt-8">
-                    <h2 class="text-xl font-bold text-red-700 mb-2">Firebase 初始化錯誤</h2>
-                    <p class="text-gray-700">${e.message}</p>
-                    <p class="text-sm mt-4">請確認 Firebase 設定和環境變數 (<code>__firebase_config</code>) 是否正確。</p>
-                </div>
-            `;
-        }
-        
-        /** 渲染單一旅遊計畫卡片 */
-        function renderPlanCard(plan) {
-            // 安全地處理 potential null/undefined 的時間戳
-            const dateString = plan.updatedAt?.toDate() ? plan.updatedAt.toDate().toLocaleString('zh-TW') : 'N/A';
-            const notesContent = plan.notes ? plan.notes.substring(0, 150) + (plan.notes.length > 150 ? '...' : '') : '無筆記';
+        // ----------------------------------------------------
+        // III. 認證服務 (Authentication Service)
+        // ----------------------------------------------------
+
+        /** 處理使用者登入 */
+        async function handleLogin(e) {
+            e.preventDefault();
+            State.dom.loginErrorDiv.textContent = '';
+            State.dom.loginErrorDiv.classList.add('hidden');
             
-            return `
-                <div class="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition duration-300 flex flex-col space-y-4">
-                    <div class="flex justify-between items-start">
-                        <div class="flex-1 min-w-0">
-                            <h3 class="text-xl font-extrabold text-indigo-800 truncate">${plan.title}</h3>
-                            <p class="text-sm text-gray-500 mt-1 flex items-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                                <span class="truncate font-medium text-indigo-600">${plan.destination}</span>
-                            </p>
-                            <p class="text-sm text-gray-500 mt-0.5 flex items-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-4 4V3m-6 4h12M6 11h12m-6 4h.01M17 11h.01M6 15h12m-6 4h.01M17 15h.01M6 19h12" /></svg>
-                                <span>${plan.date || '未定日期'}</span>
-                            </p>
-                        </div>
-                    </div>
-                    
-                    <div class="text-gray-600 text-sm bg-gray-50 p-3 rounded-lg border border-gray-100 min-h-[5rem]">
-                        <p class="font-semibold text-gray-700 mb-1">筆記預覽:</p>
-                        <p class="whitespace-pre-wrap">${notesContent}</p>
-                    </div>
-
-                    <div class="flex justify-end space-x-2 pt-2 border-t border-gray-100">
-                        <p class="text-xs text-gray-400 mr-auto flex items-center">最後更新: ${dateString}</p>
-                        <button onclick="window.openModal(${JSON.stringify(plan).replace(/"/g, '&quot;')})"
-                            class="flex items-center px-3 py-1 bg-indigo-500 text-white text-xs font-semibold rounded-full hover:bg-indigo-600 transition duration-150 shadow-md">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-9-1h5l-5-5L11 3z" /></svg>
-                            編輯
-                        </button>
-                        <button onclick="window.deletePlan('${plan.id}')"
-                            class="flex items-center px-3 py-1 bg-red-500 text-white text-xs font-semibold rounded-full hover:bg-red-600 transition duration-150 shadow-md">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                            刪除
-                        </button>
-                    </div>
-                </div>
-            `;
-        }
-
-        /** 主應用程式渲染函數 */
-        function renderApp() {
-            // 只有在 isAuthenticated 為 true 時才渲染主介面
-            if (!isAuthenticated) {
+            const email = State.dom.loginEmailSelect.value;
+            const password = State.dom.loginPasswordInput.value;
+            
+            if (!email || !password) {
+                State.dom.loginErrorDiv.textContent = '請選擇電子郵件並輸入密碼。';
+                State.dom.loginErrorDiv.classList.remove('hidden');
                 return;
             }
 
-            const header = `
-                <header class="mb-8 bg-white p-6 rounded-xl shadow-lg border-t-4 border-indigo-500">
-                    <h1 class="text-3xl font-extrabold text-gray-900">我的旅遊行程規劃器</h1>
-                    <p class="text-gray-500 mt-1">已成功登入並連接 Firebase。</p>
-                    <p class="text-xs text-gray-400 mt-2">使用者 ID: <span class="font-mono text-indigo-400">${currentUserId || 'N/A'}</span></p>
-                    
-                    <div class="mt-4 flex flex-col md:flex-row md:items-center md:space-x-4">
-                        <button onclick="window.openModal()"
-                                class="w-full md:w-auto px-6 py-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition duration-150 shadow-md transform hover:scale-[1.01] flex items-center justify-center space-x-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m-8-8h16" /></svg>
-                            <span>新增旅遊計畫</span>
-                        </button>
-                    </div>
-                </header>
-            `;
+            const loginBtn = document.getElementById('loginBtn');
+            loginBtn.disabled = true;
+            loginBtn.textContent = '登入中...';
 
-            let plansContent = '';
-            if (plans.length === 0) {
-                plansContent = `
-                    <div class="text-center p-12 bg-white rounded-xl shadow-lg">
-                        <p class="text-gray-500 text-lg">目前沒有旅遊計畫。點擊上方按鈕開始規劃您的下一段旅程！</p>
-                    </div>
-                `;
+            try {
+                await signInWithEmailAndPassword(State.auth, email, password);
+                showToast(`登入成功！歡迎 ${email}`, 'success');
+            } catch (error) {
+                console.error("登入失敗:", error);
+                let message = '登入失敗。請檢查電子郵件或密碼是否正確。';
+                if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+                     message = '密碼錯誤。';
+                }
+                State.dom.loginErrorDiv.textContent = message;
+                State.dom.loginErrorDiv.classList.remove('hidden');
+                showToast(`登入失敗: ${message}`, 'error');
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.textContent = '登入';
+            }
+        }
+
+        /** 處理使用者登出 */
+        function handleLogout() {
+            showConfirmation('登出', '您確定要登出嗎？', async () => {
+                try {
+                    await signOut(State.auth);
+                    showToast('已成功登出。', 'info');
+                } catch (e) {
+                    console.error("登出失敗:", e);
+                    showToast(`登出失敗: ${e.message}`, 'error');
+                }
+            });
+        }
+        
+        /** 處理認證狀態變更 (Auth State Changed) */
+        function handleAuthStateChange(user) {
+            if (user) {
+                // 已登入
+                State.currentUserId = user.uid;
+                State.isAuthenticated = true;
+                State.currentPage = 'plans'; // 登入後預設為「我的行程」
+                State.dom.loginModal.classList.remove('open');
+                State.dom.body.classList.add('has-nav'); // 顯示導覽列時增加 padding
+                DataService.subscribeToPlans();
             } else {
-                plansContent = `
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        ${plans.map(renderPlanCard).join('')}
+                // 未登入
+                State.currentUserId = null;
+                State.isAuthenticated = false;
+                State.plans = []; // 清空資料
+                
+                State.dom.appContainer.innerHTML = ''; // 清除主內容
+                State.dom.loginModal.classList.add('open');
+                State.dom.body.classList.remove('has-nav'); // 隱藏導覽列時移除 padding
+                
+                UiRenderer.renderBottomNav(); // 確保導覽列不被渲染
+                UiRenderer.renderApp(); 
+            }
+        }
+
+        /** 初始化 Firebase 服務並處理認證 */
+        async function initializeFirebase() {
+            setLogLevel('debug');
+            try {
+                if (!firebaseConfig || !firebaseConfig.apiKey) {
+                    throw new Error("Firebase 配置資訊不完整或缺少 apiKey。");
+                }
+                
+                State.app = initializeApp(firebaseConfig);
+                State.db = getFirestore(State.app);
+                State.auth = getAuth(State.app);
+
+                onAuthStateChanged(State.auth, handleAuthStateChange);
+
+            } catch (e) {
+                console.error("Firebase 初始化失敗:", e);
+                // 顯示初始化錯誤訊息
+                State.dom.appContainer.innerHTML = `
+                    <div class="max-w-xl mx-auto text-center bg-red-100 border-red-500 border-l-4 p-6 rounded-xl shadow-lg mt-8">
+                        <h2 class="text-xl font-bold text-red-700 mb-2">Firebase 初始化錯誤</h2>
+                        <p class="text-gray-700">${e.message}</p>
+                        <p class="text-sm mt-4">請確認 Firebase 設定和環境變數是否正確。</p>
                     </div>
                 `;
             }
-
-            appContainer.innerHTML = header + plansContent;
         }
 
+        // ----------------------------------------------------
+        // IV. 資料服務 (Data Service)
+        // ----------------------------------------------------
+
+        const DataService = {
+            /** 訂閱旅遊計畫列表 */
+            subscribeToPlans: function() {
+                if (!State.isAuthenticated || !State.currentUserId || !State.db) return;
+
+                const plansCollectionRef = collection(State.db, `artifacts/${appId}/users/${State.currentUserId}/travel_plans`);
+                const q = query(plansCollectionRef);
+
+                onSnapshot(q, (snapshot) => {
+                    State.plans = snapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data(),
+                    })).sort((a, b) => {
+                        // 在客戶端按建立時間倒序排序
+                        const dateA = a.createdAt?.toDate() || new Date(0);
+                        const dateB = b.createdAt?.toDate() || new Date(0);
+                        return dateB - dateA;
+                    });
+                    
+                    // 資料更新後，重新渲染 App
+                    UiRenderer.renderApp();
+                }, (err) => {
+                    console.error("Firestore 訂閱錯誤:", err);
+                    showToast(`資料庫連接失敗: ${err.message}`, 'error');
+                    UiRenderer.renderApp();
+                });
+            },
+
+            /** 儲存或更新旅遊計畫 */
+            savePlan: async function(planData) {
+                if (!State.isAuthenticated || !State.currentUserId || !State.db) {
+                    showToast('請先完成認證才能儲存資料。', 'error');
+                    return;
+                }
+
+                const { id, title, destination, date, notes } = planData;
+                
+                const docData = {
+                    title,
+                    destination,
+                    date,
+                    notes,
+                    updatedAt: serverTimestamp(),
+                };
+
+                try {
+                    if (id) {
+                        // 更新現有文件
+                        const planDocRef = doc(State.db, `artifacts/${appId}/users/${State.currentUserId}/travel_plans`, id);
+                        await setDoc(planDocRef, docData, { merge: true });
+                        showToast('旅遊計畫已成功更新！', 'success');
+                    } else {
+                        // 新增文件
+                        const plansCollectionRef = collection(State.db, `artifacts/${appId}/users/${State.currentUserId}/travel_plans`);
+                        // 新增文件時才加入 createdAt 欄位
+                        await addDoc(plansCollectionRef, { 
+                            ...docData, 
+                            createdAt: serverTimestamp(),
+                        });
+                        showToast('新的旅遊計畫已成功新增！', 'success');
+                    }
+                    closeModal();
+                } catch (e) {
+                    console.error("儲存計畫失敗:", e);
+                    showToast(`儲存計畫失敗: ${e.message}`, 'error');
+                }
+            },
+
+            /** 刪除旅遊計畫 */
+            deletePlan: function(planId) {
+                showConfirmation('刪除計畫', '您確定要永久刪除此旅遊計畫嗎？此操作不可逆。', async () => {
+                    if (!State.isAuthenticated || !State.currentUserId || !State.db) {
+                        showToast('認證無效，無法刪除資料。', 'error');
+                        return;
+                    }
+                    try {
+                        const planDocRef = doc(State.db, `artifacts/${appId}/users/${State.currentUserId}/travel_plans`, planId);
+                        await deleteDoc(planDocRef);
+                        showToast('旅遊計畫已刪除。', 'success');
+                    } catch (e) {
+                        console.error("刪除計畫失敗:", e);
+                        showToast(`刪除計畫失敗: ${e.message}`, 'error');
+                    }
+                });
+            }
+        };
+
 
         // ----------------------------------------------------
-        // 4. 事件監聽器與啟動 (Event Listeners & Initialization)
+        // V. UI 渲染 (UI Renderer)
         // ----------------------------------------------------
+
+        const UiRenderer = {
+            /** 處理導航切換 */
+            handleNavigation: function(page) {
+                State.currentPage = page;
+                UiRenderer.renderApp();
+            },
+            
+            /** 渲染單一旅遊計畫卡片 */
+            renderPlanCard: function(plan) {
+                const dateString = plan.updatedAt?.toDate() ? plan.updatedAt.toDate().toLocaleString('zh-TW') : 'N/A';
+                const notesContent = plan.notes ? plan.notes.substring(0, 150) + (plan.notes.length > 150 ? '...' : '') : '無筆記';
+                
+                // 使用 JSON.stringify 和 replace 確保資料能正確傳遞給內聯函數
+                const planJson = JSON.stringify(plan).replace(/"/g, '&quot;');
+
+                return `
+                    <div class="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition duration-300 flex flex-col space-y-4">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-xl font-extrabold text-indigo-800 truncate">${plan.title}</h3>
+                                <p class="text-sm text-gray-500 mt-1 flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                    <span class="truncate font-medium text-indigo-600">${plan.destination}</span>
+                                </p>
+                                <p class="text-sm text-gray-500 mt-0.5 flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-4 4V3m-6 4h12M6 11h12m-6 4h.01M17 11h.01M6 15h12m-6 4h.01M17 15h.01M6 19h12" /></svg>
+                                    <span>${plan.date || '未定日期'}</span>
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <div class="text-gray-600 text-sm bg-gray-50 p-3 rounded-lg border border-gray-100 min-h-[5rem]">
+                            <p class="font-semibold text-gray-700 mb-1">筆記預覽:</p>
+                            <p class="whitespace-pre-wrap">${notesContent}</p>
+                        </div>
+
+                        <div class="flex justify-end space-x-2 pt-2 border-t border-gray-100">
+                            <p class="text-xs text-gray-400 mr-auto flex items-center">最後更新: ${dateString}</p>
+                            <button onclick="window.openModal(${planJson})"
+                                class="flex items-center px-3 py-1 bg-indigo-500 text-white text-xs font-semibold rounded-full hover:bg-indigo-600 transition duration-150 shadow-md">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-9-1h5l-5-5L11 3z" /></svg>
+                                編輯
+                            </button>
+                            <button onclick="window.deletePlan('${plan.id}')"
+                                class="flex items-center px-3 py-1 bg-red-500 text-white text-xs font-semibold rounded-full hover:bg-red-600 transition duration-150 shadow-md">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                刪除
+                            </button>
+                        </div>
+                    </div>
+                `;
+            },
+
+            /** 渲染底部導覽列 */
+            renderBottomNav: function() {
+                if (!State.isAuthenticated) {
+                    State.dom.bottomNavContainer.innerHTML = '';
+                    return;
+                }
+
+                const navItems = State.navItems;
+
+                const navHtml = `
+                    <nav class="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-xl sm:hidden">
+                        <div class="flex justify-around items-center h-16 max-w-lg mx-auto">
+                            ${navItems.map(item => {
+                                const isActive = State.currentPage === item.id;
+                                const baseClasses = "flex flex-col items-center justify-center p-1 text-xs font-medium rounded-lg transition-colors duration-200 w-full h-full";
+                                let specificClasses = item.isAction 
+                                    ? "text-red-500 hover:text-red-700" 
+                                    : (isActive 
+                                        ? "text-indigo-600 bg-indigo-100/50" 
+                                        : "text-gray-500 hover:text-indigo-600 hover:bg-gray-50");
+                                const clickHandler = item.isAction ? 'handleLogout()' : `handleNavigation('${item.id}')`;
+                                
+                                return `
+                                    <button onclick="window.${clickHandler}" class="${baseClasses} ${specificClasses}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${item.icon}" />
+                                        </svg>
+                                        <span class="truncate">${item.label}</span>
+                                    </button>
+                                `;
+                            }).join('')}
+                        </div>
+                    </nav>
+                `;
+                State.dom.bottomNavContainer.innerHTML = navHtml;
+            },
+
+
+            /** 主應用程式渲染函數 */
+            renderApp: function() {
+                if (!State.isAuthenticated) {
+                    UiRenderer.renderBottomNav();
+                    return;
+                }
+                
+                UiRenderer.renderBottomNav();
+
+                const currentPageLabel = State.navItems.find(i => i.id === State.currentPage)?.label || '旅遊行程規劃器';
+                
+                const header = `
+                    <header class="mb-8 bg-white p-6 rounded-xl shadow-lg border-t-4 border-indigo-500">
+                        <h1 class="text-3xl font-extrabold text-gray-900">${currentPageLabel}</h1>
+                        <p class="text-gray-500 mt-1">已成功登入並連接 Firebase。</p>
+                        <p class="text-xs text-gray-400 mt-2">使用者 ID: <span class="font-mono text-indigo-400">${State.currentUserId || 'N/A'}</span></p>
+                        
+                        ${State.currentPage === 'plans' ? `
+                            <div class="mt-4 flex flex-col md:flex-row md:items-center md:space-x-4">
+                                <button onclick="window.openModal()"
+                                        class="w-full md:w-auto px-6 py-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition duration-150 shadow-md transform hover:scale-[1.01] flex items-center justify-center space-x-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m-8-8h16" /></svg>
+                                    <span>新增旅遊計畫</span>
+                                </button>
+                            </div>
+                        ` : ''}
+                    </header>
+                `;
+
+                let mainContent = '';
+
+                switch (State.currentPage) {
+                    case 'plans':
+                        if (State.plans.length === 0) {
+                            mainContent = `
+                                <div class="text-center p-12 bg-white rounded-xl shadow-lg">
+                                    <p class="text-gray-500 text-lg">目前沒有旅遊計畫。點擊上方按鈕開始規劃您的下一段旅程！</p>
+                                </div>
+                            `;
+                        } else {
+                            mainContent = `
+                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    ${State.plans.map(UiRenderer.renderPlanCard).join('')}
+                                </div>
+                            `;
+                        }
+                        break;
+                    case 'favorites':
+                        mainContent = `
+                            <div class="text-center p-12 bg-white rounded-xl shadow-lg">
+                                <h3 class="text-2xl font-bold text-indigo-700 mb-4">收藏的景點與地點</h3>
+                                <p class="text-gray-500">此功能正在建置中。您可以在此處管理您最喜歡的旅遊點。</p>
+                                <img src="https://placehold.co/400x150/818CF8/ffffff?text=Favorites+Feature" class="mx-auto mt-6 rounded-lg" onerror="this.onerror=null;this.src='https://placehold.co/400x150/818CF8/ffffff?text=Favorites+Feature';"/>
+                            </div>
+                        `;
+                        break;
+                    case 'budget':
+                        mainContent = `
+                            <div class="text-center p-12 bg-white rounded-xl shadow-lg">
+                                <h3 class="text-2xl font-bold text-indigo-700 mb-4">預算管理與支出追蹤</h3>
+                                <p class="text-gray-500">此功能正在建置中。您可以在此處追蹤和管理您的旅遊預算。</p>
+                                <img src="https://placehold.co/400x150/34D399/ffffff?text=Budget+Tracker" class="mx-auto mt-6 rounded-lg" onerror="this.onerror=null;this.src='https://placehold.co/400x150/34D399/ffffff?text=Budget+Tracker';"/>
+                            </div>
+                        `;
+                        break;
+                    case 'past':
+                        mainContent = `
+                            <div class="text-center p-12 bg-white rounded-xl shadow-lg">
+                                <h3 class="text-2xl font-bold text-indigo-700 mb-4">過去的行程回顧</h3>
+                                <p class="text-gray-500">此功能正在建置中。您可以在此處查看和回顧您已完成的旅遊行程。</p>
+                                <img src="https://placehold.co/400x150/FBBF24/ffffff?text=Past+Trips" class="mx-auto mt-6 rounded-lg" onerror="this.onerror=null;this.src='https://placehold.co/400x150/FBBF24/ffffff?text=Past+Trips';"/>
+                            </div>
+                        `;
+                        break;
+                    default:
+                        mainContent = `<div class="text-center p-12 bg-white rounded-xl shadow-lg text-red-500">找不到頁面：${State.currentPage}</div>`;
+                        break;
+                }
+
+                State.dom.appContainer.innerHTML = header + mainContent;
+            }
+        };
+
+
+        // ----------------------------------------------------
+        // VI. 啟動與事件監聽器 (Initialization & Event Listeners)
+        // ----------------------------------------------------
+
+        /** 設定全域存取點 (供 HTML 內聯事件使用) */
+        function setupGlobalAccess() {
+            window.openModal = openModal;
+            window.closeModal = closeModal;
+            window.deletePlan = DataService.deletePlan;
+            window.handleNavigation = UiRenderer.handleNavigation;
+            window.handleLogout = handleLogout;
+        }
         
-        // 1. 表單提交處理 (新增/編輯計畫)
-        planForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const planData = {
-                id: currentEditingPlan ? currentEditingPlan.id : null,
-                title: planTitleInput.value,
-                destination: planDestinationInput.value,
-                date: planDateInput.value,
-                notes: planNotesInput.value,
-            };
-            savePlan(planData);
+        /** 設定所有表單和按鈕的事件監聽器 */
+        function setupEventListeners() {
+            // 1. 新增/編輯計畫表單提交
+            State.dom.planForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const planData = {
+                    id: State.currentEditingPlan ? State.currentEditingPlan.id : null,
+                    title: State.dom.planTitleInput.value,
+                    destination: State.dom.planDestinationInput.value,
+                    date: State.dom.planDateInput.value,
+                    notes: State.dom.planNotesInput.value,
+                };
+                DataService.savePlan(planData);
+            });
+            
+            // 2. 登入表單提交
+            State.dom.loginForm.addEventListener('submit', handleLogin);
+        }
+
+        // 應用程式啟動入口
+        document.addEventListener('DOMContentLoaded', () => {
+            setupGlobalAccess();
+            setupEventListeners();
+            initializeFirebase();
         });
-        
-        // 2. 登入表單提交處理 (NEW)
-        loginForm.addEventListener('submit', handleLogin);
-
-        // 3. 設置全域函數以便 HTML 內聯調用
-        window.openModal = openModal;
-        window.closeModal = closeModal;
-        window.deletePlan = deletePlan;
-
-        // 4. 應用程式啟動
-        document.addEventListener('DOMContentLoaded', initializeFirebase);
     </script>
 </body>
 </html>
