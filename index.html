@@ -3,259 +3,237 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Firebase 設定與驗證測試</title>
-    <!-- 載入 Tailwind CSS 框架，用於美化介面 -->
+    <title>我的旅遊行程 - 2026 關西旅程</title>
+    <!-- 載入 Tailwind CSS 框架 -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 設定字體和圓角樣式 -->
     <style>
-        :root {
-            font-family: 'Inter', sans-serif;
+        /* 字體與移動端優化 */
+        :root { font-family: 'Inter', sans-serif; }
+        /* 確保底部按鈕不被遮擋 */
+        .content-area { padding-bottom: 80px; }
+        .fab {
+            /* 浮動圓形按鈕 */
+            width: 56px;
+            height: 56px;
+            box-shadow: 0 10px 15px -3px rgba(49, 46, 129, 0.5), 0 4px 6px -2px rgba(49, 46, 129, 0.2);
         }
-        .card {
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-            transition: all 0.3s ease;
+        .trip-card {
+            transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
         }
-        .success {
-            background-color: #d1fae5;
-            color: #065f46;
+        .trip-card:active {
+            transform: scale(0.98);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
         }
-        .error {
-            background-color: #fee2e2;
-            color: #991b1b;
+        /* Loading 骨架屏動畫 */
+        .skeleton {
+            animation: pulse 1.5s infinite;
         }
-        .loading {
-            background-color: #eff6ff;
-            color: #1e40af;
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
     </style>
 </head>
-<body class="bg-gray-50 flex items-center justify-center min-h-screen p-4">
-    <div id="app" class="w-full max-w-xl">
-        <h1 class="text-3xl font-extrabold text-gray-900 mb-6 text-center">
-            Firebase 啟動與測試
-        </h1>
-        <div id="status-card" class="card p-6 rounded-xl border border-gray-200">
-            <h2 class="text-xl font-semibold mb-4 text-gray-800">檢查步驟</h2>
+<body class="bg-gray-100 min-h-screen">
+    <!-- 載入登入狀態守衛 (Auth Guard) -->
+    <script type="module" src="./auth-guard.js"></script>
 
-            <!-- 步驟 1: 設定與初始化 -->
-            <div id="step-init" class="p-3 mb-3 rounded-lg loading border border-blue-300">
-                <p class="font-medium">1. Firebase 初始化狀態: <span id="init-status">載入中...</span></p>
-            </div>
-            
-            <!-- 步驟 2: 身份驗證 -->
-            <div id="step-auth" class="p-3 mb-3 rounded-lg loading border border-blue-300">
-                <p class="font-medium">2. 身份驗證狀態: <span id="auth-status">等待登入...</span></p>
-            </div>
-
-            <!-- 顯示用戶 ID (對多用戶應用程式來說非常重要) -->
-            <div id="user-info" class="p-3 mb-3 rounded-lg bg-gray-100 text-gray-600 border border-gray-300 hidden">
-                <p class="text-sm font-mono break-all">用戶 ID (UID): <span id="user-id" class="font-bold text-gray-800"></span></p>
-                <p class="text-xs mt-1">此 ID 是您在資料庫中儲存私人資料的依據。</p>
-            </div>
-
-            <!-- 步驟 3: Firestore 連線測試 -->
-            <div id="step-firestore" class="p-3 rounded-lg loading border border-blue-300">
-                <p class="font-medium">3. Firestore 連線狀態: <span id="firestore-status">等待測試...</span></p>
-            </div>
-
-            <!-- 結果回饋 -->
-            <div id="result-message" class="mt-5 p-4 rounded-xl hidden">
-                <p id="result-text" class="font-bold"></p>
-            </div>
+    <!-- 頁面頂部導航列 -->
+    <header class="sticky top-0 bg-white shadow-md z-10">
+        <div class="max-w-xl mx-auto flex justify-between items-center p-4">
+            <h1 class="text-xl font-bold text-indigo-700">我的旅程</h1>
+            <button id="logout-button" class="text-sm text-gray-500 hover:text-red-500 transition duration-150 p-2 rounded-full active:bg-red-50">
+                登出
+            </button>
         </div>
-    </div>
+    </header>
 
-    <script type="module">
-        // =======================================================================
-        // 步驟 1: 載入 Firebase 函式庫
-        // =======================================================================
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // =======================================================================
-        // 獲取 UI 元素
-        // =======================================================================
-        const initStatusEl = document.getElementById('init-status');
-        const initStepEl = document.getElementById('step-init');
-        const authStatusEl = document.getElementById('auth-status');
-        const authStepEl = document.getElementById('step-auth');
-        const firestoreStatusEl = document.getElementById('firestore-status');
-        const firestoreStepEl = document.getElementById('step-firestore');
-        const userIdEl = document.getElementById('user-id');
-        const userInfoEl = document.getElementById('user-info');
-        const resultMessageEl = document.getElementById('result-message');
-        const resultTextEl = document.getElementById('result-text');
-
-        // =======================================================================
-        // 步驟 2: 初始化 Firebase 應用程式和服務
-        // 加入您的手動配置作為備用方案 (硬編碼)
-        // =======================================================================
-        let app;
-        let auth;
-        let db;
-        let userId = 'N/A';
+    <!-- 行程列表區 -->
+    <main class="content-area max-w-xl mx-auto p-4">
         
-        // --- 您的手動配置 (作為環境變數載入失敗時的備用方案) ---
-        const manualFirebaseConfig = {
-            apiKey: "AIzaSyBsMiLUgtJtcv48iRp_9QFx5fShtRd6Lro",
-            authDomain: "kobe-osaka-2026travel.firebaseapp.com",
-            projectId: "kobe-osaka-2026travel",
-            storageBucket: "kobe-osaka-2026travel.firebasestorage.app",
-            messagingSenderId: "772246724994",
-            appId: "1:772246724994:web:26c067ae1096d13ebdef9b"
-        };
-        // ----------------------------------------------------------------------
+        <!-- Loading 狀態或無行程時的提示 -->
+        <div id="loading-spinner" class="mt-8 text-center text-gray-500">
+            <svg class="animate-spin h-8 w-8 text-indigo-500 mx-auto mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p>正在載入您的旅程列表...</p>
+        </div>
 
-        try {
-            // 嘗試解析環境配置，如果失敗，則使用手動配置
-            let firebaseConfig = manualFirebaseConfig;
-            if (typeof __firebase_config !== 'undefined' && JSON.parse(__firebase_config).projectId) {
-                 firebaseConfig = JSON.parse(__firebase_config);
-            }
-            
-            if (Object.keys(firebaseConfig).length === 0 || !firebaseConfig.projectId) {
-                throw new Error("無法找到有效的 Firebase 設定，請確認專案已連結。");
-            }
+        <!-- 行程列表容器 -->
+        <div id="trip-list-container" class="space-y-4">
+            <!-- 行程卡片將透過 JavaScript 插入這裡 -->
+        </div>
+        
+        <!-- 無行程提示 -->
+        <div id="no-trips-message" class="mt-16 p-6 text-center text-gray-500 bg-white rounded-xl shadow hidden">
+            <p class="text-lg font-semibold mb-2">您尚未建立任何旅程 🇯🇵</p>
+            <p class="text-sm">點擊右下角的按鈕開始規劃您的 2026 關西之旅！</p>
+        </div>
 
-            // 確定 appId。如果環境變數有值，則優先使用環境變數。
-            const appId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.appId || 'default-app-id';
+    </main>
 
+    <!-- 新增行程的 FAB (浮動圓形按鈕) -->
+    <button id="add-trip-fab" class="fab fixed bottom-6 right-6 flex items-center justify-center 
+                                        bg-indigo-600 hover:bg-indigo-700 text-white 
+                                        rounded-full transition duration-200 z-20 active:shadow-none">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+        </svg>
+    </button>
+    
+    <!-- 頁面邏輯腳本 -->
+    <script type="module">
+        import { auth, db } from './auth.js';
+        import { signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { collection, query, onSnapshot, orderBy, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-            // 初始化 Firebase App
-            app = initializeApp(firebaseConfig);
-            auth = getAuth(app);
-            db = getFirestore(app);
+        // UI 元素
+        const tripListContainer = document.getElementById('trip-list-container');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const noTripsMessage = document.getElementById('no-trips-message');
+        const logoutButton = document.getElementById('logout-button');
+        const addTripFab = document.getElementById('add-trip-fab');
 
-            initStatusEl.textContent = '成功！應用程式與服務已初始化。';
-            initStepEl.classList.remove('loading');
-            initStepEl.classList.add('success');
+        let currentUserId = null;
+        let unsubscribe = null; // 用於儲存 Firestore 監聽器的取消函式
 
-            // 進行身份驗證
-            initAuthAndTestConnection(appId);
-
-        } catch (error) {
-            console.error("Firebase 初始化失敗:", error);
-            initStatusEl.textContent = `失敗: ${error.message}`;
-            initStepEl.classList.remove('loading');
-            initStepEl.classList.add('error');
-            
-            // 顯示最終失敗訊息
-            resultMessageEl.classList.remove('hidden');
-            resultMessageEl.classList.add('error');
-            resultTextEl.textContent = '初始化失敗，請確保 Firebase 專案已建立並設定 Identity Toolkit API。';
-        }
-
-        // =======================================================================
-        // 步驟 3 & 4: 身份驗證與測試連線
-        // =======================================================================
-        async function initAuthAndTestConnection(appId) {
+        // 登出功能
+        logoutButton.addEventListener('click', async () => {
             try {
-                const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-                let userCredential;
-
-                // 優先使用自訂 Token 登入 (Canvas 環境專用)
-                if (initialAuthToken) {
-                    authStatusEl.textContent = '嘗試使用自訂 Token 登入...';
-                    userCredential = await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    // 否則使用匿名登入
-                    authStatusEl.textContent = '嘗試使用匿名登入...';
-                    userCredential = await signInAnonymously(auth);
-                }
-
-                userId = userCredential.user.uid;
-                
-                authStatusEl.textContent = '成功！用戶已登入。';
-                authStepEl.classList.remove('loading');
-                authStepEl.classList.add('success');
-
-                userIdEl.textContent = userId;
-                userInfoEl.classList.remove('hidden');
-
-                // 進行連線測試
-                await testFirestoreConnection(appId);
-
+                await signOut(auth);
+                // 登出後 auth-guard.js 會自動導向 login.html
             } catch (error) {
-                // 檢查是否是常見的 API 金鑰錯誤
-                if (error.code === 'auth/invalid-api-key') {
-                    error.message = 'API Key 無效或 API 限制過於嚴格。';
-                }
-                
-                console.error("Firebase 身份驗證失敗:", error);
-                authStatusEl.textContent = `失敗: ${error.message}`;
-                authStepEl.classList.remove('loading');
-                authStepEl.classList.add('error');
-                
-                // Firestore 測試也標記為失敗
-                firestoreStatusEl.textContent = '無法連線 (身份驗證失敗)。';
-                firestoreStepEl.classList.remove('loading');
-                firestoreStepEl.classList.add('error');
-
-                // 顯示最終失敗訊息
-                resultMessageEl.classList.remove('hidden');
-                resultMessageEl.classList.add('error');
-                resultTextEl.textContent = '身份驗證失敗，請檢查 Firebase Identity Toolkit API 是否已啟用。';
+                console.error("登出失敗:", error);
+                alert("登出失敗，請檢查網路連線。"); // 實際應用程式應使用自訂 Modal
             }
-        }
+        });
 
-        // =======================================================================
-        // 步驟 5: 測試 Firestore 資料庫連線
-        // 嘗試讀取一個公開文件來測試權限
-        // =======================================================================
-        async function testFirestoreConnection(appId) {
-            firestoreStatusEl.textContent = '嘗試讀取測試文件...';
+        // 監聽 AuthReady 事件，確保 Firebase 服務已初始化且用戶已登入
+        document.addEventListener('authReady', (e) => {
+            currentUserId = e.detail.uid;
             
-            // 使用公開路徑: /artifacts/{appId}/public/data/status_check/test_doc
-            const docRef = doc(db, `artifacts/${appId}/public/data/status_check/test_doc`);
+            // 由於 Auth 已就緒，可以安全地開始載入行程
+            loadTrips();
+        });
 
-            try {
-                // 為了測試讀取，我們需要確保文件存在，所以先嘗試寫入（如果不存在則創建）
-                await setDoc(docRef, { 
-                    lastChecked: new Date().toISOString(),
-                    checkedBy: userId 
-                }, { merge: true });
-
-                const docSnap = await getDoc(docRef);
-
-                if (docSnap.exists()) {
-                    firestoreStatusEl.textContent = '成功！資料庫可讀寫。';
-                    firestoreStepEl.classList.remove('loading');
-                    firestoreStepEl.classList.add('success');
-
-                    // 顯示最終成功訊息
-                    resultMessageEl.classList.remove('hidden');
-                    resultMessageEl.classList.add('success');
-                    resultTextEl.textContent = `恭喜！您的 Firebase 專案已完全配置成功，可以開始開發應用程式了。`;
-                } else {
-                    // 如果文件不存在，但寫入成功，我們仍認為連線是成功的，只是讀取測試可能需要更久
-                    firestoreStatusEl.textContent = '成功！文件已建立，資料庫連線正常。';
-                    firestoreStepEl.classList.remove('loading');
-                    firestoreStepEl.classList.add('success');
-                    
-                    // 顯示最終成功訊息
-                    resultMessageEl.classList.remove('hidden');
-                    resultMessageEl.classList.add('success');
-                    resultTextEl.textContent = `恭喜！您的 Firebase 專案已完全配置成功，可以開始開發應用程式了。`;
-                }
-
-            } catch (error) {
-                // 檢查是否是常見的權限錯誤
-                if (error.code === 'permission-denied') {
-                    error.message = '安全規則拒絕存取。';
-                }
-                
-                console.error("Firestore 連線測試失敗:", error);
-                firestoreStatusEl.textContent = `失敗: ${error.message}`;
-                firestoreStepEl.classList.remove('loading');
-                firestoreStepEl.classList.add('error');
-
-                // 顯示最終失敗訊息
-                resultMessageEl.classList.remove('hidden');
-                resultMessageEl.classList.add('error');
-                resultTextEl.textContent = 'Firestore 連線失敗，請**確保您已在 Firebase Console 中建立 Firestore 資料庫，且安全規則允許讀寫**。';
+        // 載入行程列表
+        function loadTrips() {
+            if (!currentUserId) {
+                console.error("錯誤: 用戶 ID 尚未載入。");
+                return;
             }
+
+            // 根據您的架構，行程資料應存儲在共用路徑下，以便團隊成員編輯
+            // 假設共用行程的路徑為: /artifacts/{appId}/public/data/trips
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            const tripsColRef = collection(db, `artifacts/${appId}/public/data/trips`);
+            
+            // 查詢: 這裡我們只顯示團隊成員的行程，為了測試，我們暫時顯示所有公開行程
+            // 實際應用中，您可能需要一個 'members' 陣列來過濾
+            const tripsQuery = query(
+                tripsColRef,
+                // 為了簡單起見，我們在這裡不使用 orderBy，避免Firestore索引問題。
+                // 實際排序應在前端進行。
+            );
+
+            // 設定 Firestore 即時監聽
+            unsubscribe = onSnapshot(tripsQuery, (snapshot) => {
+                loadingSpinner.classList.add('hidden'); // 隱藏載入提示
+                tripListContainer.innerHTML = ''; // 清空現有列表
+
+                if (snapshot.empty) {
+                    noTripsMessage.classList.remove('hidden');
+                    return;
+                }
+
+                noTripsMessage.classList.add('hidden');
+                
+                // 將資料轉換為陣列並在前端排序
+                const trips = [];
+                snapshot.forEach(doc => {
+                    trips.push({ id: doc.id, ...doc.data() });
+                });
+                
+                // 依據最後編輯時間排序 (最新的在最上面)
+                trips.sort((a, b) => {
+                    // 將 Firebase Timestamp 轉換為數字進行比較
+                    const timeA = a.lastEditedTime?.toMillis() || 0;
+                    const timeB = b.lastEditedTime?.toMillis() || 0;
+                    return timeB - timeA;
+                });
+
+                // 渲染行程列表
+                trips.forEach(trip => {
+                    const card = createTripCard(trip);
+                    tripListContainer.appendChild(card);
+                });
+
+            }, (error) => {
+                console.error("Firestore 即時監聽失敗:", error);
+                loadingSpinner.innerHTML = `<p class="text-red-600">載入錯誤: ${error.message}。請檢查安全規則。</p>`;
+            });
         }
+
+        // 建立單個行程卡片的 HTML 元素
+        function createTripCard(trip) {
+            const startDate = trip.startDate ? new Date(trip.startDate.seconds * 1000).toLocaleDateString('zh-TW') : '未定';
+            const endDate = trip.endDate ? new Date(trip.endDate.seconds * 1000).toLocaleDateString('zh-TW') : '未定';
+            
+            const lastEditedTime = trip.lastEditedTime 
+                ? new Date(trip.lastEditedTime.seconds * 1000).toLocaleString('zh-TW', { dateStyle: 'short', timeStyle: 'short' })
+                : '無';
+            
+            const lastEditorName = trip.lastEditorName || '匿名使用者';
+            
+            const card = document.createElement('a');
+            card.href = `trip.html?tripId=${trip.id}`; // 點擊進入行程內容頁
+            card.className = 'trip-card block bg-white p-5 rounded-xl shadow-md border border-gray-200 hover:border-indigo-400 transition duration-150 cursor-pointer';
+            card.innerHTML = `
+                <div class="flex justify-between items-start mb-3">
+                    <h2 class="text-xl font-extrabold text-gray-800 truncate">${trip.name || '未命名旅程'}</h2>
+                    <!-- 編輯/刪除按鈕 (這裡只是視覺占位符，實際手勢操作將在下一步實作) -->
+                    <div class="flex space-x-2 text-gray-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hover:text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-7 1l-7-7m7 7l7-7m-7 7l7-7m-7 1l4-4m-4 4l4-4"/></svg>
+                        <!-- <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hover:text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.86 12.04A2 2 0 0116.14 21H7.86a2 2 0 01-1.99-1.96L5 7m1 0h12m-6 4v6m-4-6v6m8-6v6"/></svg> -->
+                    </div>
+                </div>
+                
+                <p class="text-sm font-semibold text-indigo-600 mb-4">${startDate} ~ ${endDate}</p>
+
+                <div class="flex justify-between text-xs text-gray-500">
+                    <div>
+                        <span class="font-medium">天數:</span> ${trip.daysCount || 0} 天
+                    </div>
+                    <div class="text-right">
+                        <span class="font-medium">最後編輯者:</span> ${lastEditorName}
+                        <br>
+                        <span class="font-medium">編輯時間:</span> ${lastEditedTime}
+                    </div>
+                </div>
+            `;
+            return card;
+        }
+
+        // 新增行程功能 (彈出 Modal 或跳轉到編輯頁面)
+        addTripFab.addEventListener('click', () => {
+            // 這裡可以導向 trip.html 或彈出一個 Modal 讓用戶輸入行程名稱
+            // 暫時使用簡單的提示和跳轉
+            const tripName = prompt("請輸入新行程名稱:");
+            if (tripName) {
+                // 這裡應該將資料寫入 Firestore，然後跳轉
+                alert(`正在創建新的行程: ${tripName}`); // 實際應用程式應使用 setDoc/addDoc
+                // window.location.href = 'trip.html?mode=new'; 
+            }
+        });
+
+        // 當頁面被卸載時，取消 Firestore 的監聽
+        window.addEventListener('beforeunload', () => {
+            if (unsubscribe) {
+                unsubscribe();
+            }
+        });
+
     </script>
 </body>
 </html>
