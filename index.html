@@ -137,14 +137,15 @@
     <script type="module">
         // --- 1. Firebase 核心服務初始化與認證檢查 ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        // 導入 Email/Password 登入功能
+        import { getAuth, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, setLogLevel, collection, query, onSnapshot, doc, addDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // 設定日誌級別
         setLogLevel('debug'); 
 
         // =======================================================
-        // 您的 Firebase 配置 (已手動替換)
+        // 您的 Firebase 配置
         // =======================================================
         const firebaseConfig = {
             apiKey: "AIzaSyBsMiLUgtJtcv48iRp_9QFx5fShtRd6Lro",
@@ -156,8 +157,14 @@
         };
         // =======================================================
         
+        // =======================================================
+        // *** 測試專用憑證 (已硬編碼到程式碼中) ***
+        // =======================================================
+        const TEST_EMAIL = "test@team.com";
+        const TEST_PASSWORD = "password123";
+        // =======================================================
+
         // 環境變數
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
         const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
         let app, auth, db;
@@ -232,17 +239,10 @@
             if (!firebaseInitialized) return;
 
             try {
-                let userCredential;
+                // *** 核心變動：使用 signInWithEmailAndPassword 登入 ***
+                console.log(`嘗試使用測試帳號 ${TEST_EMAIL} 登入...`);
+                const userCredential = await signInWithEmailAndPassword(auth, TEST_EMAIL, TEST_PASSWORD);
                 
-                // 嘗試使用自訂令牌登入，若無則匿名登入
-                if (initialAuthToken) {
-                    console.log("使用自訂認證令牌登入...");
-                    userCredential = await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    console.log("使用匿名身份登入 (未提供令牌)...");
-                    userCredential = await signInAnonymously(auth);
-                }
-
                 currentUserId = userCredential.user.uid;
                 console.log("登入成功，用戶 ID:", currentUserId);
                 
@@ -257,7 +257,8 @@
 
             } catch (error) {
                 console.error("登入失敗:", error);
-                displayError('身份驗證失敗：' + error.message);
+                // 提供更明確的錯誤訊息，指示可能是帳密問題
+                displayError(`身份驗證失敗：${error.message}。請確認測試帳號 ${TEST_EMAIL} 已在 Firebase 專案中註冊並啟用。`);
             }
         }
 
