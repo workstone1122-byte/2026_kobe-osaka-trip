@@ -3,234 +3,307 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>我的旅遊行程 - 2026 關西旅程</title>
+    <title>我的旅行行程</title>
     <!-- 載入 Tailwind CSS 框架 -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 載入 Lucide Icons (用於圖標) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        /* 字體與移動端優化 */
         :root { font-family: 'Inter', sans-serif; }
-        /* 確保底部按鈕不被遮擋 */
-        .content-area { padding-bottom: 80px; }
-        .fab {
-            /* 浮動圓形按鈕 */
-            width: 56px;
-            height: 56px;
-            box-shadow: 0 10px 15px -3px rgba(49, 46, 129, 0.5), 0 4px 6px -2px rgba(49, 46, 129, 0.2);
-        }
+        .page-container { max-width: 640px; }
         .trip-card {
-            transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+            transition: all 0.2s ease-in-out;
         }
-        .trip-card:active {
-            transform: scale(0.98);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+        .trip-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
         }
-        /* Loading 骨架屏動畫 */
-        .skeleton {
-            animation: pulse 1.5s infinite;
+        /* 懸浮新增按鈕 */
+        .fab {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 50;
         }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+        @media (min-width: 640px) {
+            /* 讓按鈕在 PC 模式下，也保持在內容區域的右下方 */
+            .fab {
+                right: calc(50% - 320px + 24px); /* max-width: 640px / 2 + 24px 邊距 */
+            }
         }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
-    <!-- 載入登入狀態守衛 (Auth Guard) -->
-    <script type="module" src="./auth-guard.js"></script>
+<body class="bg-gray-50 min-h-screen pb-20">
 
     <!-- 頁面頂部導航列 -->
     <header class="sticky top-0 bg-white shadow-md z-10">
-        <div class="max-w-xl mx-auto flex justify-between items-center p-4">
-            <h1 class="text-xl font-bold text-indigo-700">我的旅程</h1>
-            <button id="logout-button" class="text-sm text-gray-500 hover:text-red-500 transition duration-150 p-2 rounded-full active:bg-red-50">
-                登出
+        <div class="page-container mx-auto flex justify-between items-center p-4">
+            <h1 class="text-2xl font-bold text-indigo-700">我的旅程</h1>
+            <button id="logout-button" class="text-gray-500 hover:text-red-600 transition duration-150 p-2 rounded-full active:bg-red-50" title="登出">
+                <!-- Lucide: Log Out Icon -->
+                <script>document.write(lucide.createIcons()['log-out'].toSvg({ class: 'h-6 w-6' }));</script>
             </button>
         </div>
     </header>
 
-    <!-- 行程列表區 -->
-    <main class="content-area max-w-xl mx-auto p-4">
+    <!-- 主要內容區塊 -->
+    <main class="page-container mx-auto p-4">
         
-        <!-- Loading 狀態或無行程時的提示 -->
-        <div id="loading-spinner" class="mt-8 text-center text-gray-500">
-            <svg class="animate-spin h-8 w-8 text-indigo-500 mx-auto mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <p>正在載入您的旅程列表...</p>
+        <!-- 用戶 ID 顯示 (用於測試與協作) -->
+        <div class="mb-4 p-3 bg-indigo-100 border border-indigo-200 rounded-lg text-sm text-indigo-700">
+            <span class="font-medium">您的用戶 ID (UID):</span> 
+            <code id="user-id-display" class="font-mono text-xs break-all ml-1">載入中...</code>
         </div>
 
         <!-- 行程列表容器 -->
-        <div id="trip-list-container" class="space-y-4">
-            <!-- 行程卡片將透過 JavaScript 插入這裡 -->
-        </div>
-        
-        <!-- 無行程提示 -->
-        <div id="no-trips-message" class="mt-16 p-6 text-center text-gray-500 bg-white rounded-xl shadow hidden">
-            <p class="text-lg font-semibold mb-2">您尚未建立任何旅程 🇯🇵</p>
-            <p class="text-sm">點擊右下角的按鈕開始規劃您的 2026 關西之旅！</p>
+        <div id="trip-list" class="space-y-4">
+            <!-- 行程卡片將通過 JavaScript 渲染在此處 -->
         </div>
 
+        <!-- 空行程提示 (預設隱藏) -->
+        <div id="no-trips-message" class="hidden text-center mt-20 p-6 bg-white rounded-xl shadow-lg border border-gray-100">
+            <span class="text-6xl" role="img" aria-label="Japan Flag">🇯🇵</span>
+            <p class="mt-4 text-xl font-semibold text-gray-700">您尚未建立任何旅程</p>
+            <p class="text-gray-500 mt-2">點擊右下角的 <span class="font-bold">+</span> 按鈕，開始規劃您的第一趟旅行！</p>
+        </div>
     </main>
-
-    <!-- 新增行程的 FAB (浮動圓形按鈕) -->
-    <button id="add-trip-fab" class="fab fixed bottom-6 right-6 flex items-center justify-center 
-                                        bg-indigo-600 hover:bg-indigo-700 text-white 
-                                        rounded-full transition duration-200 z-20 active:shadow-none">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-        </svg>
+    
+    <!-- 懸浮新增按鈕 (FAB) -->
+    <button id="add-trip-fab" class="fab p-4 bg-pink-500 text-white rounded-full shadow-lg hover:bg-pink-600 transition duration-200 ease-in-out transform hover:scale-105 active:scale-95" title="新增行程">
+        <!-- Lucide: Plus Icon -->
+        <script>document.write(lucide.createIcons()['plus'].toSvg({ class: 'h-8 w-8' }));</script>
     </button>
     
-    <!-- 頁面邏輯腳本 -->
+    <!-- 自訂輸入 Modal (取代 prompt()) -->
+    <div id="new-trip-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
+            <h3 class="text-xl font-semibold mb-4 text-gray-800">新增旅程</h3>
+            <form id="new-trip-form">
+                <label for="new-trip-name" class="block text-sm font-medium text-gray-700 mb-2">請輸入新行程名稱：</label>
+                <input type="text" id="new-trip-name" required maxlength="50"
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
+                       placeholder="例如：2026 神戶大阪美食之旅">
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button type="button" id="cancel-new-trip"
+                            class="px-4 py-2 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition duration-150">
+                        取消
+                    </button>
+                    <button type="submit" id="create-trip-button"
+                            class="px-4 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition duration-150">
+                        建立
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 載入 Firebase 核心模組與登入守衛 -->
+    <script type="module" src="./auth.js"></script>
+    <script type="module" src="./auth-guard.js"></script>
+
+    <!-- 主要應用程式邏輯 -->
     <script type="module">
         import { auth, db } from './auth.js';
         import { signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { collection, query, onSnapshot, orderBy, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { collection, query, onSnapshot, orderBy, where, doc, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // UI 元素
-        const tripListContainer = document.getElementById('trip-list-container');
-        const loadingSpinner = document.getElementById('loading-spinner');
+        const tripListElement = document.getElementById('trip-list');
         const noTripsMessage = document.getElementById('no-trips-message');
-        const logoutButton = document.getElementById('logout-button');
         const addTripFab = document.getElementById('add-trip-fab');
+        const logoutButton = document.getElementById('logout-button');
+        const userIdDisplay = document.getElementById('user-id-display');
+        
+        // NEW UI ELEMENTS for Modal
+        const newTripModal = document.getElementById('new-trip-modal');
+        const newTripForm = document.getElementById('new-trip-form');
+        const newTripNameInput = document.getElementById('new-trip-name');
+        const cancelNewTripButton = document.getElementById('cancel-new-trip');
+        const createTripButton = document.getElementById('create-trip-button');
 
-        let currentUserId = null;
-        let unsubscribe = null; // 用於儲存 Firestore 監聽器的取消函式
 
-        // 登出功能
+        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        let unsubscribe = null; // 用於存放 Firestore 監聽器的取消函數
+
+        // 登出按鈕事件處理
         logoutButton.addEventListener('click', async () => {
-            try {
-                await signOut(auth);
-                // 登出後 auth-guard.js 會自動導向 login.html
-            } catch (error) {
-                console.error("登出失敗:", error);
-                alert("登出失敗，請檢查網路連線。"); // 實際應用程式應使用自訂 Modal
-            }
-        });
-
-        // 監聽 AuthReady 事件，確保 Firebase 服務已初始化且用戶已登入
-        document.addEventListener('authReady', (e) => {
-            currentUserId = e.detail.uid;
-            
-            // 由於 Auth 已就緒，可以安全地開始載入行程
-            loadTrips();
-        });
-
-        // 載入行程列表
-        function loadTrips() {
-            if (!currentUserId) {
-                console.error("錯誤: 用戶 ID 尚未載入。");
-                return;
-            }
-
-            // 根據您的架構，行程資料應存儲在共用路徑下，以便團隊成員編輯
-            // 假設共用行程的路徑為: /artifacts/{appId}/public/data/trips
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-            const tripsColRef = collection(db, `artifacts/${appId}/public/data/trips`);
-            
-            // 查詢: 這裡我們只顯示團隊成員的行程，為了測試，我們暫時顯示所有公開行程
-            // 實際應用中，您可能需要一個 'members' 陣列來過濾
-            const tripsQuery = query(
-                tripsColRef,
-                // 為了簡單起見，我們在這裡不使用 orderBy，避免Firestore索引問題。
-                // 實際排序應在前端進行。
-            );
-
-            // 設定 Firestore 即時監聽
-            unsubscribe = onSnapshot(tripsQuery, (snapshot) => {
-                loadingSpinner.classList.add('hidden'); // 隱藏載入提示
-                tripListContainer.innerHTML = ''; // 清空現有列表
-
-                if (snapshot.empty) {
-                    noTripsMessage.classList.remove('hidden');
-                    return;
+            if (confirm('確定要登出嗎？')) {
+                try {
+                    await signOut(auth);
+                    // 登出後會被 auth-guard.js 導向到 login.html
+                    window.location.replace('./login.html'); 
+                } catch (error) {
+                    console.error("登出失敗:", error);
+                    alert("登出失敗: " + error.message); // 實際應用程式應使用自訂 Modal
                 }
+            }
+        });
 
-                noTripsMessage.classList.add('hidden');
-                
-                // 將資料轉換為陣列並在前端排序
-                const trips = [];
-                snapshot.forEach(doc => {
-                    trips.push({ id: doc.id, ...doc.data() });
-                });
-                
-                // 依據最後編輯時間排序 (最新的在最上面)
-                trips.sort((a, b) => {
-                    // 將 Firebase Timestamp 轉換為數字進行比較
-                    const timeA = a.lastEditedTime?.toMillis() || 0;
-                    const timeB = b.lastEditedTime?.toMillis() || 0;
-                    return timeB - timeA;
-                });
 
-                // 渲染行程列表
-                trips.forEach(trip => {
-                    const card = createTripCard(trip);
-                    tripListContainer.appendChild(card);
-                });
-
-            }, (error) => {
-                console.error("Firestore 即時監聽失敗:", error);
-                loadingSpinner.innerHTML = `<p class="text-red-600">載入錯誤: ${error.message}。請檢查安全規則。</p>`;
-            });
-        }
-
-        // 建立單個行程卡片的 HTML 元素
-        function createTripCard(trip) {
-            const startDate = trip.startDate ? new Date(trip.startDate.seconds * 1000).toLocaleDateString('zh-TW') : '未定';
-            const endDate = trip.endDate ? new Date(trip.endDate.seconds * 1000).toLocaleDateString('zh-TW') : '未定';
-            
-            const lastEditedTime = trip.lastEditedTime 
-                ? new Date(trip.lastEditedTime.seconds * 1000).toLocaleString('zh-TW', { dateStyle: 'short', timeStyle: 'short' })
-                : '無';
-            
-            const lastEditorName = trip.lastEditorName || '匿名使用者';
-            
-            const card = document.createElement('a');
-            card.href = `trip.html?tripId=${trip.id}`; // 點擊進入行程內容頁
-            card.className = 'trip-card block bg-white p-5 rounded-xl shadow-md border border-gray-200 hover:border-indigo-400 transition duration-150 cursor-pointer';
+        // 渲染單個行程卡片
+        const renderTripCard = (trip) => {
+            const card = document.createElement('div');
+            // 將 trip ID 放入 data 屬性，用於點擊時識別
+            card.dataset.id = trip.id; 
+            card.className = 'trip-card bg-white p-5 rounded-xl shadow-lg border border-gray-100 cursor-pointer flex items-center justify-between';
             card.innerHTML = `
-                <div class="flex justify-between items-start mb-3">
-                    <h2 class="text-xl font-extrabold text-gray-800 truncate">${trip.name || '未命名旅程'}</h2>
-                    <!-- 編輯/刪除按鈕 (這裡只是視覺占位符，實際手勢操作將在下一步實作) -->
-                    <div class="flex space-x-2 text-gray-400">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hover:text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-7 1l-7-7m7 7l7-7m-7 7l7-7m-7 1l4-4m-4 4l4-4"/></svg>
-                        <!-- <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hover:text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.86 12.04A2 2 0 0116.14 21H7.86a2 2 0 01-1.99-1.96L5 7m1 0h12m-6 4v6m-4-6v6m8-6v6"/></svg> -->
-                    </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800">${trip.name}</h3>
+                    <p class="text-sm text-gray-500 mt-1">
+                        <span class="mr-3">天數: ${trip.days}</span>
+                        <span class="text-xs inline-flex items-center font-medium bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                            <script>document.write(lucide.createIcons()['users'].toSvg({ class: 'h-3 w-3 mr-1' }));</script>
+                            共編: ${trip.memberCount || 1}
+                        </span>
+                    </p>
+                    <p class="text-xs text-gray-400 mt-2">最後更新: ${trip.lastUpdated ? new Date(trip.lastUpdated.seconds * 1000).toLocaleString('zh-TW') : 'N/A'}</p>
                 </div>
-                
-                <p class="text-sm font-semibold text-indigo-600 mb-4">${startDate} ~ ${endDate}</p>
-
-                <div class="flex justify-between text-xs text-gray-500">
-                    <div>
-                        <span class="font-medium">天數:</span> ${trip.daysCount || 0} 天
-                    </div>
-                    <div class="text-right">
-                        <span class="font-medium">最後編輯者:</span> ${lastEditorName}
-                        <br>
-                        <span class="font-medium">編輯時間:</span> ${lastEditedTime}
-                    </div>
+                <div class="text-indigo-500">
+                    <script>document.write(lucide.createIcons()['chevron-right'].toSvg({ class: 'h-6 w-6' }));</script>
                 </div>
             `;
-            return card;
-        }
 
-        // 新增行程功能 (彈出 Modal 或跳轉到編輯頁面)
-        addTripFab.addEventListener('click', () => {
-            // 這裡可以導向 trip.html 或彈出一個 Modal 讓用戶輸入行程名稱
-            // 暫時使用簡單的提示和跳轉
-            const tripName = prompt("請輸入新行程名稱:");
-            if (tripName) {
-                // 這裡應該將資料寫入 Firestore，然後跳轉
-                alert(`正在創建新的行程: ${tripName}`); // 實際應用程式應使用 setDoc/addDoc
-                // window.location.href = 'trip.html?mode=new'; 
+            // 點擊事件：導向到 trip.html
+            card.addEventListener('click', () => {
+                // 使用相對路徑跳轉，並帶上 tripId 參數
+                window.location.href = `./trip.html?tripId=${trip.id}`;
+            });
+
+            return card;
+        };
+
+
+        // 啟動 Firestore 監聽
+        const startTripListener = (user) => {
+            const userId = user.uid;
+            userIdDisplay.textContent = userId;
+
+            // 1. 定義行程集合的路徑
+            // 路徑: /artifacts/{APP_ID}/public/data/trips
+            const tripsCollectionRef = collection(db, 'artifacts', APP_ID, 'public', 'data', 'trips');
+
+            // 2. 建立查詢: 這裡我們只抓取公開的 trips 集合中的所有文件
+            const q = query(tripsCollectionRef); 
+
+            // 如果已經有監聽器在運行，先取消它
+            if (unsubscribe) {
+                unsubscribe();
             }
+
+            // 3. 實時監聽 (onSnapshot)
+            unsubscribe = onSnapshot(q, (querySnapshot) => {
+                const trips = [];
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    trips.push({
+                        id: doc.id,
+                        name: data.name || '未命名行程',
+                        days: data.days || 1,
+                        memberCount: data.members ? data.members.length : 1, 
+                        lastUpdated: data.updatedAt 
+                    });
+                });
+
+                // 排序 (在客戶端排序，依據最後更新時間降序排列)
+                trips.sort((a, b) => {
+                    const dateA = a.lastUpdated ? a.lastUpdated.seconds : 0;
+                    const dateB = b.lastUpdated ? b.lastUpdated.seconds : 0;
+                    return dateB - dateA;
+                });
+
+
+                // 渲染 UI
+                tripListElement.innerHTML = '';
+                if (trips.length === 0) {
+                    noTripsMessage.classList.remove('hidden');
+                } else {
+                    noTripsMessage.classList.add('hidden');
+                    trips.forEach(trip => {
+                        tripListElement.appendChild(renderTripCard(trip));
+                    });
+                }
+            }, (error) => {
+                console.error("Firestore 監聽失敗:", error);
+                alert("無法載入行程列表，請檢查網路或權限設定。");
+                noTripsMessage.classList.remove('hidden'); 
+                noTripsMessage.innerHTML = `<span class="text-red-500">載入失敗！${error.code}</span>`;
+            });
+        };
+
+
+        // 點擊 '+' 按鈕新增行程的邏輯 (現在只負責顯示 Modal)
+        addTripFab.addEventListener('click', () => {
+            if (!auth.currentUser) {
+                 // 這裡應該不會發生，因為有 auth-guard 保護，但作為防護
+                 alert("請先登入以創建行程！");
+                 return;
+            }
+            // 顯示自定義 Modal
+            newTripModal.classList.remove('hidden');
+            newTripNameInput.focus();
+        });
+        
+        // 取消按鈕邏輯
+        cancelNewTripButton.addEventListener('click', () => {
+            newTripModal.classList.add('hidden');
+            newTripForm.reset(); // 清空表單
+        });
+
+        // 表單提交邏輯 (取代原來的 prompt() 及其後續操作)
+        newTripForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const tripName = newTripNameInput.value.trim();
+            
+            if (!tripName) return; 
+            
+            createTripButton.disabled = true;
+            createTripButton.textContent = '建立中...';
+            
+            try {
+                const userId = auth.currentUser.uid;
+                const newTripRef = collection(db, 'artifacts', APP_ID, 'public', 'data', 'trips');
+
+                // 1. 準備新的行程資料
+                const newTripData = {
+                    name: tripName,
+                    days: 1, // 預設 1 天
+                    members: [userId], // 創建者自動成為第一個成員
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp(),
+                };
+                
+                // 2. 寫入 Firestore
+                const docRef = await addDoc(newTripRef, newTripData);
+                console.log("新行程文件寫入成功，ID:", docRef.id);
+                
+                // 3. 隱藏 Modal 並導向頁面
+                newTripModal.classList.add('hidden');
+                newTripForm.reset(); 
+                
+                // 使用相對路徑跳轉，並帶上新行程的 ID
+                window.location.href = `./trip.html?tripId=${docRef.id}`; 
+                
+            } catch (error) {
+                console.error("新增行程失敗:", error);
+                alert("新增行程失敗：" + error.message); 
+            } finally {
+                createTripButton.disabled = false;
+                createTripButton.textContent = '建立';
+            }
+        });
+
+
+        // 監聽 auth-guard.js 觸發的 'authReady' 事件
+        document.addEventListener('authReady', (e) => {
+            console.log("Auth is ready, starting Firestore listener...");
+            startTripListener(e.detail);
         });
 
         // 當頁面被卸載時，取消 Firestore 的監聽
         window.addEventListener('beforeunload', () => {
             if (unsubscribe) {
                 unsubscribe();
+                console.log("Firestore 監聽已取消。");
             }
         });
 
