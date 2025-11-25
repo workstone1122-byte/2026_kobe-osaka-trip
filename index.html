@@ -1,687 +1,753 @@
-import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Clock, Plus, Trash2, X } from 'lucide-react';
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <!-- 區塊功能: 文件元數據與樣式引入 -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>旅遊行程規劃器</title>
+    <!-- 引入 Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 使用 Inter 字體以獲得更好的現代感 */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* 隱藏原生彈出式對話框，我們使用自定義 Modal */
+        .modal-overlay {
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+        .modal-overlay.open {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
 
-// ============================================
-// 🔧 工具函數模塊 (Utility Functions)
-// ============================================
-
-/**
- * 日期格式化工具
- * @param {string} dateString - YYYY-MM-DD 格式的日期字串
- * @returns {string} 格式化後的日期 "YYYY/MM/DD (週X)"
- */
-const formatDate = (dateString) => {
-  if (!dateString) return '日期未定';
-  try {
-    const date = new Date(dateString);
-    date.setMinutes(date.getMinutes() + date.getTimezoneOffset());
-    
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
-    const weekday = weekdays[date.getDay()];
-    
-    return `${year}/${month}/${day} (週${weekday})`;
-  } catch (error) {
-    console.error("日期格式化錯誤:", error);
-    return dateString;
-  }
-};
-
-/**
- * 生成日期範圍陣列
- * @param {string} start - 開始日期 YYYY-MM-DD
- * @param {string} end - 結束日期 YYYY-MM-DD
- * @returns {Array} 包含所有日期和天數編號的陣列
- */
-const getDatesArray = (start, end) => {
-  const dates = [];
-  let currentDate = new Date(start + 'T00:00:00');
-  const endDate = new Date(end + 'T00:00:00');
-  let dayCount = 1;
-
-  while (currentDate <= endDate) {
-    dates.push({
-      date: currentDate.toISOString().split('T')[0],
-      day: dayCount
-    });
-    currentDate.setDate(currentDate.getDate() + 1);
-    dayCount++;
-  }
-  return dates;
-};
-
-/**
- * 生成唯一 ID
- * @returns {string} 唯一識別碼
- */
-const generateId = () => {
-  return `id_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-};
-
-// ============================================
-// 🎨 UI 組件模塊 (UI Components)
-// ============================================
-
-/**
- * 模態視窗組件 - 可重用的彈出視窗
- * @param {Object} props
- * @param {boolean} props.isOpen - 是否顯示
- * @param {Function} props.onClose - 關閉回調
- * @param {string} props.title - 標題
- * @param {ReactNode} props.children - 內容
- */
-const Modal = ({ isOpen, onClose, title, children }) => {
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6">
-        <div className="flex justify-between items-center mb-4 border-b pb-3">
-          <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <X className="w-6 h-6" />
-          </button>
+    <!-- 區塊功能: 主要應用程式容器 (內容由 JS 動態生成) -->
+    <div id="app" class="p-4 sm:p-8">
+        <!-- 初始載入狀態 -->
+        <div class="flex items-center justify-center min-h-screen">
+            <p class="text-lg font-semibold text-indigo-600">載入中... 正在連接 Firebase...</p>
         </div>
-        {children}
-      </div>
     </div>
-  );
-};
 
-/**
- * 訊息提示組件 - 顯示成功/錯誤訊息
- */
-const MessageAlert = ({ message, type = 'success', onClose }) => {
-  useEffect(() => {
-    const timer = setTimeout(onClose, 5000);
-    return () => clearTimeout(timer);
-  }, [onClose]);
-
-  const className = type === 'error' 
-    ? 'bg-red-100 border-red-400 text-red-700' 
-    : 'bg-green-100 border-green-400 text-green-700';
-
-  return (
-    <div className={`${className} border-l-4 p-4 rounded-lg shadow-md mb-6`}>
-      <p className="font-bold">{type === 'error' ? '錯誤' : '通知'}</p>
-      <p>{message}</p>
-    </div>
-  );
-};
-
-/**
- * 旅遊計畫卡片組件
- */
-const PlanCard = ({ plan, onView, onDelete }) => {
-  return (
-    <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col justify-between hover:shadow-xl transition duration-300 border-t-4 border-indigo-500">
-      <div>
-        <h3 className="text-xl font-bold text-gray-800 mb-2">{plan.name}</h3>
-        <div className="text-sm text-gray-500 space-y-1">
-          <p className="flex items-center">
-            <Calendar className="w-4 h-4 mr-2 text-indigo-400" />
-            {formatDate(plan.startDate)}
-          </p>
-          <p className="flex items-center">
-            <Calendar className="w-4 h-4 mr-2 text-indigo-400" />
-            {formatDate(plan.endDate)}
-          </p>
-          {plan.destination && (
-            <p className="flex items-center">
-              <MapPin className="w-4 h-4 mr-2 text-indigo-400" />
-              {plan.destination}
-            </p>
-          )}
-        </div>
-      </div>
-      <div className="flex justify-end space-x-3 mt-4">
-        <button
-          onClick={() => onDelete(plan.id)}
-          className="p-2 text-red-500 hover:text-red-700 transition duration-150 rounded-full hover:bg-red-50"
-          title="刪除計畫"
-        >
-          <Trash2 className="w-5 h-5" />
-        </button>
-        <button
-          onClick={() => onView(plan.id)}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-2 px-4 rounded-xl transition duration-300"
-        >
-          查看行程
-        </button>
-      </div>
-    </div>
-  );
-};
-
-/**
- * 行程卡片組件
- */
-const ItineraryCard = ({ item, onDelete }) => {
-  return (
-    <div className="bg-white rounded-xl shadow-md p-5 border-l-4 border-emerald-500 relative ml-4 transition duration-300 hover:shadow-lg">
-      <div className="flex justify-between items-start">
-        <div className="flex-1">
-          <div className="flex items-center text-sm font-medium text-emerald-600 mb-1">
-            <Clock className="w-4 h-4 mr-2" />
-            {item.time || '全天'}
-          </div>
-          <h4 className="text-lg font-bold text-gray-800 mb-2">{item.activity}</h4>
-          {item.location && (
-            <p className="text-sm text-gray-600 flex items-center">
-              <MapPin className="w-4 h-4 mr-1 text-gray-400" />
-              地點: {item.location}
-            </p>
-          )}
-          {item.notes && item.notes !== '無備註' && (
-            <p className="text-sm text-gray-500 mt-2 italic border-t border-gray-100 pt-2">
-              備註: {item.notes}
-            </p>
-          )}
-        </div>
-        <button
-          onClick={() => onDelete(item.id)}
-          className="p-1 text-red-400 hover:text-red-600 transition duration-150 rounded-full"
-          title="刪除行程"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
-      </div>
-    </div>
-  );
-};
-
-// ============================================
-// 📋 表單組件模塊 (Form Components)
-// ============================================
-
-/**
- * 新增/編輯計畫表單
- */
-const PlanForm = ({ onSubmit, onCancel }) => {
-  const [formData, setFormData] = useState({
-    name: '',
-    destination: '',
-    startDate: '',
-    endDate: ''
-  });
-
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    
-    if (!formData.name || !formData.startDate || !formData.endDate) {
-      alert('請填寫計畫名稱、開始日期和結束日期。');
-      return;
-    }
-
-    if (new Date(formData.startDate) > new Date(formData.endDate)) {
-      alert('開始日期不能晚於結束日期。');
-      return;
-    }
-
-    onSubmit(formData);
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-gray-700">計畫名稱*</label>
-        <input
-          type="text"
-          name="name"
-          value={formData.name}
-          onChange={handleChange}
-          className="mt-1 block w-full border border-gray-300 rounded-lg p-3 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-          required
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700">目的地 (可選)</label>
-        <input
-          type="text"
-          name="destination"
-          value={formData.destination}
-          onChange={handleChange}
-          className="mt-1 block w-full border border-gray-300 rounded-lg p-3 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700">開始日期*</label>
-          <input
-            type="date"
-            name="startDate"
-            value={formData.startDate}
-            onChange={handleChange}
-            className="mt-1 block w-full border border-gray-300 rounded-lg p-3 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">結束日期*</label>
-          <input
-            type="date"
-            name="endDate"
-            value={formData.endDate}
-            onChange={handleChange}
-            className="mt-1 block w-full border border-gray-300 rounded-lg p-3 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-            required
-          />
-        </div>
-      </div>
-      <div className="pt-4 flex justify-end space-x-3">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition"
-        >
-          取消
-        </button>
-        <button
-          type="submit"
-          className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition shadow-md"
-        >
-          建立計畫
-        </button>
-      </div>
-    </form>
-  );
-};
-
-/**
- * 新增行程表單
- */
-const ItineraryForm = ({ dates, onSubmit, onCancel, preselectedDate }) => {
-  const [formData, setFormData] = useState({
-    activity: '',
-    date: preselectedDate || (dates[0]?.date || ''),
-    time: '',
-    location: '',
-    notes: ''
-  });
-
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    
-    if (!formData.activity || !formData.date) {
-      alert('請填寫活動名稱和日期。');
-      return;
-    }
-
-    onSubmit(formData);
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-gray-700">活動名稱*</label>
-        <input
-          type="text"
-          name="activity"
-          value={formData.activity}
-          onChange={handleChange}
-          className="mt-1 block w-full border border-gray-300 rounded-lg p-3 shadow-sm focus:ring-emerald-500 focus:border-emerald-500"
-          required
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700">選擇日期*</label>
-          <select
-            name="date"
-            value={formData.date}
-            onChange={handleChange}
-            className="mt-1 block w-full border border-gray-300 rounded-lg p-3 shadow-sm focus:ring-emerald-500 focus:border-emerald-500"
-            required
-          >
-            {dates.map(d => (
-              <option key={d.date} value={d.date}>
-                Day {d.day} - {formatDate(d.date)}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">時間 (可選)</label>
-          <input
-            type="time"
-            name="time"
-            value={formData.time}
-            onChange={handleChange}
-            className="mt-1 block w-full border border-gray-300 rounded-lg p-3 shadow-sm focus:ring-emerald-500 focus:border-emerald-500"
-          />
-        </div>
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700">地點 (可選)</label>
-        <input
-          type="text"
-          name="location"
-          value={formData.location}
-          onChange={handleChange}
-          className="mt-1 block w-full border border-gray-300 rounded-lg p-3 shadow-sm focus:ring-emerald-500 focus:border-emerald-500"
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700">備註/筆記 (可選)</label>
-        <textarea
-          name="notes"
-          value={formData.notes}
-          onChange={handleChange}
-          rows="3"
-          className="mt-1 block w-full border border-gray-300 rounded-lg p-3 shadow-sm focus:ring-emerald-500 focus:border-emerald-500"
-        />
-      </div>
-      <div className="pt-4 flex justify-end space-x-3">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition"
-        >
-          取消
-        </button>
-        <button
-          type="submit"
-          className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition shadow-md"
-        >
-          儲存行程
-        </button>
-      </div>
-    </form>
-  );
-};
-
-// ============================================
-// 🏠 主應用程式組件 (Main App Component)
-// ============================================
-
-export default function TravelPlanner() {
-  // ============================================
-  // 狀態管理 (State Management)
-  // ============================================
-  
-  const [plans, setPlans] = useState([]); // 所有旅遊計畫
-  const [activePlanId, setActivePlanId] = useState(null); // 當前查看的計畫 ID
-  const [showPlanModal, setShowPlanModal] = useState(false); // 顯示新增計畫彈窗
-  const [showItineraryModal, setShowItineraryModal] = useState(false); // 顯示新增行程彈窗
-  const [preselectedDate, setPreselectedDate] = useState(null); // 預選的日期
-  const [message, setMessage] = useState(null); // 訊息提示 {text, type}
-
-  // ============================================
-  // 初始化 - 從 localStorage 載入資料
-  // ============================================
-  
-  useEffect(() => {
-    const savedPlans = localStorage.getItem('travelPlans');
-    if (savedPlans) {
-      setPlans(JSON.parse(savedPlans));
-    }
-  }, []);
-
-  // ============================================
-  // 資料持久化 - 儲存到 localStorage
-  // ============================================
-  
-  useEffect(() => {
-    if (plans.length > 0) {
-      localStorage.setItem('travelPlans', JSON.stringify(plans));
-    }
-  }, [plans]);
-
-  // ============================================
-  // 計畫操作函數 (Plan Operations)
-  // ============================================
-
-  /**
-   * 新增旅遊計畫
-   */
-  const handleAddPlan = (planData) => {
-    const newPlan = {
-      id: generateId(),
-      ...planData,
-      itineraries: [],
-      createdAt: new Date().toISOString()
-    };
-    
-    setPlans([newPlan, ...plans]);
-    setShowPlanModal(false);
-    setMessage({ text: '旅遊計畫建立成功!', type: 'success' });
-  };
-
-  /**
-   * 刪除旅遊計畫
-   */
-  const handleDeletePlan = (planId) => {
-    if (!window.confirm('確定要刪除此旅遊計畫嗎?這將無法復原。')) return;
-    
-    setPlans(plans.filter(p => p.id !== planId));
-    if (activePlanId === planId) setActivePlanId(null);
-    setMessage({ text: '旅遊計畫已刪除。', type: 'success' });
-  };
-
-  // ============================================
-  // 行程操作函數 (Itinerary Operations)
-  // ============================================
-
-  /**
-   * 新增行程項目
-   */
-  const handleAddItinerary = (itineraryData) => {
-    const newItinerary = {
-      id: generateId(),
-      ...itineraryData,
-      notes: itineraryData.notes || '無備註'
-    };
-
-    setPlans(plans.map(plan => {
-      if (plan.id === activePlanId) {
-        return {
-          ...plan,
-          itineraries: [...plan.itineraries, newItinerary]
-        };
-      }
-      return plan;
-    }));
-
-    setShowItineraryModal(false);
-    setPreselectedDate(null);
-    setMessage({ text: '行程卡片新增成功!', type: 'success' });
-  };
-
-  /**
-   * 刪除行程項目
-   */
-  const handleDeleteItinerary = (itineraryId) => {
-    if (!window.confirm('確定要刪除此行程卡片嗎?')) return;
-
-    setPlans(plans.map(plan => {
-      if (plan.id === activePlanId) {
-        return {
-          ...plan,
-          itineraries: plan.itineraries.filter(item => item.id !== itineraryId)
-        };
-      }
-      return plan;
-    }));
-
-    setMessage({ text: '行程卡片已刪除。', type: 'success' });
-  };
-
-  // ============================================
-  // 渲染邏輯 (Render Logic)
-  // ============================================
-
-  const activePlan = plans.find(p => p.id === activePlanId);
-  const datesArray = activePlan ? getDatesArray(activePlan.startDate, activePlan.endDate) : [];
-
-  /**
-   * 渲染單日行程
-   */
-  const renderDayItinerary = (date, day) => {
-    const dayItineraries = activePlan.itineraries
-      .filter(item => item.date === date)
-      .sort((a, b) => (a.time || '23:59').localeCompare(b.time || '23:59'));
-
-    return (
-      <div key={date} className="relative border-l-4 border-indigo-300 ml-4 pl-6">
-        <div className="absolute -left-3 top-0 bg-indigo-600 text-white px-3 py-1 rounded-full text-sm font-bold shadow-md">
-          Day {day}
-        </div>
-        <h3 className="text-xl font-semibold text-gray-800 mb-6 mt-0 pt-0 ml-4">
-          {formatDate(date)}
-        </h3>
-
-        <div className="space-y-6">
-          {dayItineraries.length === 0 ? (
-            <div className="text-gray-500 italic ml-4">這一天還沒有安排行程。</div>
-          ) : (
-            dayItineraries.map(item => (
-              <ItineraryCard key={item.id} item={item} onDelete={handleDeleteItinerary} />
-            ))
-          )}
-
-          <button
-            onClick={() => {
-              setPreselectedDate(date);
-              setShowItineraryModal(true);
-            }}
-            className="flex items-center justify-center w-full max-w-sm ml-4 bg-white border-2 border-dashed border-indigo-300 text-indigo-600 hover:bg-indigo-50 transition duration-150 py-3 rounded-xl shadow-sm font-medium"
-          >
-            <Plus className="w-5 h-5 mr-2" />
-            新增當日行程卡片
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  // ============================================
-  // 主要渲染 (Main Render)
-  // ============================================
-
-  return (
-    <div className="bg-gray-100 min-h-screen p-4 sm:p-8">
-      {/* 訊息提示 */}
-      {message && (
-        <MessageAlert
-          message={message.text}
-          type={message.type}
-          onClose={() => setMessage(null)}
-        />
-      )}
-
-      {/* 計畫列表視圖 */}
-      {!activePlanId && (
-        <>
-          <header className="flex justify-between items-center mb-6">
-            <h1 className="text-3xl font-extrabold text-gray-900">我的旅遊計畫</h1>
-            <button
-              onClick={() => setShowPlanModal(true)}
-              className="flex items-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-xl shadow-md transition duration-300 transform hover:scale-105"
-            >
-              <Plus className="w-5 h-5 mr-2" />
-              新增計畫
-            </button>
-          </header>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {plans.length === 0 ? (
-              <div className="col-span-full text-center py-10 bg-white rounded-xl shadow">
-                <p className="text-xl text-gray-500">尚無旅遊計畫。點擊「新增計畫」開始規劃!</p>
-              </div>
-            ) : (
-              plans.map(plan => (
-                <PlanCard
-                  key={plan.id}
-                  plan={plan}
-                  onView={setActivePlanId}
-                  onDelete={handleDeletePlan}
-                />
-              ))
-            )}
-          </div>
-        </>
-      )}
-
-      {/* 行程詳情視圖 */}
-      {activePlanId && activePlan && (
-        <>
-          <header className="mb-6 bg-white p-6 rounded-xl shadow-lg border-b-4 border-indigo-600">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <button
-                  onClick={() => setActivePlanId(null)}
-                  className="text-indigo-600 hover:text-indigo-800 transition mb-2 flex items-center"
-                >
-                  ← 返回計畫列表
+    <!-- 區塊功能: Modal - 新增/編輯旅遊計畫表單 -->
+    <div id="addPlanModal" class="modal-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6">
+            <div class="flex justify-between items-center mb-4 border-b pb-3">
+                <h2 class="text-2xl font-bold text-gray-800" id="planModalTitle">新增旅遊計畫</h2>
+                <button onclick="closeAddPlanModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
                 </button>
-                <h1 className="text-3xl font-extrabold text-gray-900">{activePlan.name}</h1>
-                <p className="text-md text-gray-500 mt-1">
-                  {formatDate(activePlan.startDate)} ~ {formatDate(activePlan.endDate)} ({datesArray.length} 天)
-                </p>
-                {activePlan.destination && (
-                  <p className="text-sm text-gray-600 mt-2 flex items-center">
-                    <MapPin className="w-4 h-4 mr-1 text-gray-400" />
-                    {activePlan.destination}
-                  </p>
-                )}
-              </div>
-              <button
-                onClick={() => handleDeletePlan(activePlan.id)}
-                className="p-3 text-red-500 hover:text-red-700 transition duration-150 rounded-full hover:bg-red-50 border border-red-200"
-                title="刪除此計畫"
-              >
-                <Trash2 className="w-5 h-5" />
-              </button>
             </div>
-          </header>
-
-          <div className="space-y-10">
-            {datesArray.map(({ date, day }) => renderDayItinerary(date, day))}
-          </div>
-        </>
-      )}
-
-      {/* 新增計畫 Modal */}
-      <Modal
-        isOpen={showPlanModal}
-        onClose={() => setShowPlanModal(false)}
-        title="新增旅遊計畫"
-      >
-        <PlanForm
-          onSubmit={handleAddPlan}
-          onCancel={() => setShowPlanModal(false)}
-        />
-      </Modal>
-
-      {/* 新增行程 Modal */}
-      <Modal
-        isOpen={showItineraryModal}
-        onClose={() => {
-          setShowItineraryModal(false);
-          setPreselectedDate(null);
-        }}
-        title="新增行程卡片"
-      >
-        <ItineraryForm
-          dates={datesArray}
-          preselectedDate={preselectedDate}
-          onSubmit={handleAddItinerary}
-          onCancel={() => {
-            setShowItineraryModal(false);
-            setPreselectedDate(null);
-          }}
-        />
-      </Modal>
+            <form id="addPlanForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">計畫名稱*</label>
+                    <input type="text" id="planName" class="mt-1 block w-full border border-gray-300 rounded-lg p-3 shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">目的地 (可選)</label>
+                    <input type="text" id="planDestination" class="mt-1 block w-full border border-gray-300 rounded-lg p-3 shadow-sm focus:ring-indigo-500 focus:border-indigo-500" />
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">開始日期*</label>
+                        <input type="date" id="planStartDate" class="mt-1 block w-full border border-gray-300 rounded-lg p-3 shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">結束日期*</label>
+                        <input type="date" id="planEndDate" class="mt-1 block w-full border border-gray-300 rounded-lg p-3 shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required />
+                    </div>
+                </div>
+                <div class="pt-4 flex justify-end space-x-3">
+                    <button type="button" onclick="closeAddPlanModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition">
+                        取消
+                    </button>
+                    <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition shadow-md">
+                        建立計畫
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
-  );
-}
+
+    <!-- 區塊功能: Modal - 新增行程卡片表單 -->
+    <div id="addItineraryModal" class="modal-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6">
+            <div class="flex justify-between items-center mb-4 border-b pb-3">
+                <h2 class="text-2xl font-bold text-gray-800">新增行程卡片</h2>
+                <button onclick="closeAddItineraryModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <form id="addItineraryForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">活動名稱*</label>
+                    <input type="text" id="itineraryActivity" class="mt-1 block w-full border border-gray-300 rounded-lg p-3 shadow-sm focus:ring-emerald-500 focus:border-emerald-500" required />
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">選擇日期*</label>
+                        <select id="itineraryDate" class="mt-1 block w-full border border-gray-300 rounded-lg p-3 shadow-sm focus:ring-emerald-500 focus:border-emerald-500" required>
+                            <!-- 選項將由 JS 動態填充 -->
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">時間 (可選)</label>
+                        <input type="time" id="itineraryTime" class="mt-1 block w-full border border-gray-300 rounded-lg p-3 shadow-sm focus:ring-emerald-500 focus:border-emerald-500" />
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">地點 (可選)</label>
+                    <input type="text" id="itineraryLocation" class="mt-1 block w-full border border-gray-300 rounded-lg p-3 shadow-sm focus:ring-emerald-500 focus:border-emerald-500" />
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">備註/筆記 (可選)</label>
+                    <textarea id="itineraryNotes" rows="3" class="mt-1 block w-full border border-gray-300 rounded-lg p-3 shadow-sm focus:ring-emerald-500 focus:border-emerald-500"></textarea>
+                </div>
+
+                <div class="pt-4 flex justify-end space-x-3">
+                    <button type="button" onclick="closeAddItineraryModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition">
+                        取消
+                    </button>
+                    <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition shadow-md">
+                        儲存行程
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- 區塊功能: 核心 JavaScript 邏輯 (模塊化分區) -->
+    <script type="module">
+        // --- 引入 Firebase 模組 ---
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            signInWithEmailAndPassword, 
+            createUserWithEmailAndPassword 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            doc, 
+            getDoc, 
+            addDoc, 
+            updateDoc, 
+            deleteDoc, 
+            onSnapshot, 
+            collection, 
+            query, 
+            serverTimestamp, 
+            setLogLevel 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- 0. 配置與變數 (Configuration & Global State) ---
+        
+        /* * 🔥 **資安重要提示：Firebase 配置**
+         * * 1. **在當前環境中：** Firebase 配置 (__firebase_config) 和應用程式 ID (__app_id)
+         * 是通過安全的系統全域變數自動且隱私地傳入的。您不需要手動粘貼 API Key。
+         * * 2. **部署到 GitHub Pages/Vercel/Netlify 時：** * - 為了資安考量，**絕對不要**將您的 firebaseConfig 物件直接硬編碼在這裡並提交到 GitHub。
+         * - 您應該使用該平臺的**環境變數**功能來傳入您的配置。
+         * - 如果您遇到部署問題，請檢查您的部署環境是否正確設定了類似 `FIREBASE_CONFIG` 的變數。
+        */
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        
+        // 硬編碼的測試用戶憑證 (用於確保環境初始化)
+        const HARDCODED_EMAIL = 'test@team.com';
+        const HARDCODED_PASSWORD = '123456';
+
+
+        // 全域狀態變數
+        let db = null;
+        let auth = null;
+        let currentUserId = null;
+        let isAuthenticated = false;
+        let plans = []; // 儲存所有旅遊計畫
+        let activePlanId = null; // 當前查看的計畫 ID
+        let datesArray = []; // 儲存當前活躍計畫的日期列表
+
+
+        // --- 1. 輔助函數 (Helper Functions) ---
+
+        /**
+         * 將日期字串格式化為 "YYYY/MM/DD (週X)"
+         * @param {string} dateString - 格式為 YYYY-MM-DD 的日期字串
+         */
+        function formatDate(dateString) {
+            if (!dateString) return '日期未定';
+            try {
+                const date = new Date(dateString);
+                // 處理時區問題
+                date.setMinutes(date.getMinutes() + date.getTimezoneOffset()); 
+
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+                const weekday = weekdays[date.getDay()];
+                return `${year}/${month}/${day} (週${weekday})`;
+            } catch (error) {
+                console.error("日期格式化錯誤:", error);
+                return dateString;
+            }
+        }
+
+        /**
+         * 計算兩個日期之間的天數（含起訖日）並生成日期陣列
+         * @param {string} start - 開始日期 (YYYY-MM-DD)
+         * @param {string} end - 結束日期 (YYYY-MM-DD)
+         * @returns {Array<{date: string, day: number}>} - 包含日期和天數編號的陣列
+         */
+        function getDatesArray(start, end) {
+            const dates = [];
+            let currentDate = new Date(start + 'T00:00:00');
+            const endDate = new Date(end + 'T00:00:00');
+            let dayCount = 1;
+
+            while (currentDate <= endDate) {
+                dates.push({
+                    date: currentDate.toISOString().split('T')[0],
+                    day: dayCount
+                });
+                currentDate.setDate(currentDate.getDate() + 1);
+                dayCount++;
+            }
+            return dates;
+        }
+
+        /**
+         * 獲取 Firestore 文件參考路徑 (私有用戶資料)
+         * @param {string} planId - 旅遊計畫 ID
+         */
+        function getPlanDocRef(planId) {
+            if (!db || !currentUserId) throw new Error("Firebase 未初始化或用戶 ID 未知");
+            // 使用 /artifacts/{appId}/users/{userId}/travel_plans 路徑
+            return doc(db, `artifacts/${appId}/users/${currentUserId}/travel_plans`, planId);
+        }
+
+        /**
+         * 顯示自定義錯誤/通知訊息 (取代 alert)
+         * @param {string} message - 訊息內容
+         * @param {boolean} isError - 是否為錯誤訊息
+         */
+        function showMessage(message, isError = false) {
+            const app = document.getElementById('app');
+            const existingMessage = document.getElementById('appMessage');
+            if (existingMessage) existingMessage.remove();
+
+            const className = isError 
+                ? 'bg-red-100 border-red-400 text-red-700' 
+                : 'bg-green-100 border-green-400 text-green-700';
+
+            const messageHtml = `
+                <div id="appMessage" class="${className} border-l-4 p-4 rounded-lg shadow-md mb-6 transition-all duration-300">
+                    <p class="font-bold">${isError ? '錯誤' : '通知'}</p>
+                    <p>${message}</p>
+                </div>
+            `;
+            app.insertAdjacentHTML('afterbegin', messageHtml);
+            setTimeout(() => {
+                document.getElementById('appMessage')?.classList.add('opacity-0');
+                setTimeout(() => document.getElementById('appMessage')?.remove(), 300);
+            }, 5000);
+        }
+        
+        /** 替換 window.confirm 的自定義 Modal 邏輯 (這裡僅為模擬) */
+        function confirmAction(message) {
+            console.warn(`[Confirm Action Required]: ${message} - 假設用戶點擊了 "確定"。`);
+            return true; 
+        }
+
+        // --- 2. Firebase CRUD 操作 (CRUD Operations) ---
+
+        /** 新增旅遊計畫 */
+        async function handleAddPlan(planData) {
+            if (!db || !currentUserId) return;
+
+            try {
+                await addDoc(collection(db, `artifacts/${appId}/users/${currentUserId}/travel_plans`), {
+                    ...planData,
+                    userId: currentUserId,
+                    itineraries: [], // 初始行程為空陣列
+                    createdAt: serverTimestamp()
+                });
+                closeAddPlanModal();
+                showMessage('旅遊計畫建立成功！');
+            } catch (e) {
+                console.error("新增計畫失敗:", e);
+                showMessage(`新增計畫失敗: ${e.message}`, true);
+            }
+        }
+
+        /** 刪除旅遊計畫 */
+        async function handleDeletePlan(planId) {
+            if (!db || !currentUserId) return;
+
+            if (!confirmAction('確定要刪除此旅遊計畫嗎？這將無法復原。')) return;
+            
+            try {
+                await deleteDoc(getPlanDocRef(planId));
+                activePlanId = null; // 如果刪除當前計畫，則返回列表
+                showMessage('旅遊計畫已刪除。');
+            } catch (e) {
+                console.error("刪除計畫失敗:", e);
+                showMessage(`刪除計畫失敗: ${e.message}`, true);
+            }
+        }
+
+        /** 新增行程卡片 */
+        async function handleAddItinerary(itineraryData) {
+            if (!activePlanId) return;
+
+            try {
+                const planDocRef = getPlanDocRef(activePlanId);
+                const planDoc = await getDoc(planDocRef);
+                if (!planDoc.exists()) {
+                    throw new Error("找不到旅遊計畫。");
+                }
+
+                let currentItineraries = planDoc.data().itineraries || [];
+                
+                if (!itineraryData.date || typeof itineraryData.date !== 'string') {
+                    throw new Error("行程日期無效。");
+                }
+                
+                const newItinerary = {
+                    id: crypto.randomUUID(), // 使用 UUID 確保唯一性
+                    ...itineraryData,
+                    order: currentItineraries.length + 1, // 簡單排序
+                    notes: itineraryData.notes || '無備註'
+                };
+
+                currentItineraries.push(newItinerary);
+
+                await updateDoc(planDocRef, {
+                    itineraries: currentItineraries
+                });
+
+                closeAddItineraryModal();
+                showMessage('行程卡片新增成功！');
+
+            } catch (e) {
+                console.error("新增行程失敗:", e);
+                showMessage(`新增行程失敗: ${e.message}`, true);
+            }
+        }
+
+        /** 刪除行程卡片 */
+        async function handleDeleteItinerary(itineraryId) {
+            if (!activePlanId) return;
+
+            if (!confirmAction('確定要刪除此行程卡片嗎？')) return;
+
+            try {
+                const planDocRef = getPlanDocRef(activePlanId);
+                const planDoc = await getDoc(planDocRef);
+                if (!planDoc.exists()) return;
+
+                const currentItineraries = planDoc.data().itineraries || [];
+                const updatedItineraries = currentItineraries
+                    .filter(item => item.id !== itineraryId)
+                    .map((item, index) => ({ ...item, order: index + 1 })); // 重新排序
+
+                await updateDoc(planDocRef, {
+                    itineraries: updatedItineraries
+                });
+                showMessage('行程卡片已刪除。');
+
+            } catch (e) {
+                console.error("刪除行程失敗:", e);
+                showMessage(`刪除行程失敗: ${e.message}`, true);
+            }
+        }
+
+        // --- 3. UI 渲染函數 (Rendering Functions) ---
+
+        /** 渲染單個行程卡片 HTML */
+        function renderItineraryCard(item) {
+            return `
+                <div class="bg-white rounded-xl shadow-md p-5 border-l-4 border-emerald-500 relative ml-4 transition duration-300 hover:shadow-lg">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <div class="flex items-center text-sm font-medium text-emerald-600 mb-1">
+                                <svg class="w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                ${item.time || '全天'}
+                            </div>
+                            <h4 class="text-lg font-bold text-gray-800 mb-2">${item.activity}</h4>
+                            ${item.location ? `
+                            <p class="text-sm text-gray-600 flex items-center">
+                                <svg class="w-4 h-4 mr-1 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                                地點: ${item.location}
+                            </p>` : ''}
+                            ${item.notes && item.notes !== '無備註' ? `
+                            <p class="text-sm text-gray-500 mt-2 italic border-t border-gray-100 pt-2">
+                                備註: ${item.notes}
+                            </p>` : ''}
+                        </div>
+                        <button onclick="handleDeleteItinerary('${item.id}')"
+                            class="p-1 text-red-400 hover:text-red-600 transition duration-150 rounded-full"
+                            title="刪除行程">
+                            <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M15 6V4c0-1-1-2-2-2h-2c-1 0-2 1-2 2v2"/></svg>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        /** 渲染單日行程分組 HTML */
+        function renderDayItinerary(date, day, items) {
+            // 對行程按時間排序
+            const sortedItems = items.sort((a, b) => (a.time || '23:59').localeCompare(b.time || '23:59'));
+
+            const itemsHtml = sortedItems.length === 0 
+                ? `<div class="text-gray-500 italic ml-4">這一天還沒有安排行程。</div>`
+                : sortedItems.map(renderItineraryCard).join('');
+
+            return `
+                <div class="relative border-l-4 border-indigo-300 ml-4 pl-6">
+                    <!-- 日期標籤 -->
+                    <div class="absolute -left-3 top-0 bg-indigo-600 text-white px-3 py-1 rounded-full text-sm font-bold shadow-md">
+                        Day ${day}
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-6 mt-0 pt-0 ml-4">${formatDate(date)}</h3>
+
+                    <div class="space-y-6">
+                        ${itemsHtml}
+                        <!-- 新增行程按鈕 -->
+                        <button onclick="openAddItineraryModal('${date}')"
+                            class="flex items-center justify-center w-full max-w-sm ml-4 bg-white border-2 border-dashed border-indigo-300 text-indigo-600 hover:bg-indigo-50 transition duration-150 py-3 rounded-xl shadow-sm font-medium">
+                            <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                            新增當日行程卡片
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        /** 渲染旅遊計畫詳情頁面 (行程時間軸) */
+        function renderPlanDetail(plan) {
+            datesArray = getDatesArray(plan.startDate, plan.endDate);
+            
+            // 按日期分組行程
+            const groupedItineraries = datesArray.reduce((acc, { date, day }) => {
+                acc[date] = {
+                    day: day,
+                    items: (plan.itineraries || [])
+                        .filter(item => item.date === date)
+                };
+                return acc;
+            }, {});
+
+            let dayItinerariesHtml = datesArray.map(({ date, day }) => {
+                const group = groupedItineraries[date];
+                return renderDayItinerary(date, day, group.items);
+            }).join('');
+
+            return `
+                <header class="mb-6 bg-white p-6 rounded-xl shadow-lg border-b-4 border-indigo-600">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <button onclick="activePlanId = null; renderApp();" class="text-indigo-600 hover:text-indigo-800 transition mb-2 flex items-center">
+                                &larr; 返回計畫列表
+                            </button>
+                            <h1 class="text-3xl font-extrabold text-gray-900">${plan.name}</h1>
+                            <p class="text-md text-gray-500 mt-1">${formatDate(plan.startDate)} ~ ${formatDate(plan.endDate)} (${datesArray.length} 天)</p>
+                            ${plan.destination ? `
+                            <p class="text-sm text-gray-600 mt-2 flex items-center">
+                                <svg class="w-4 h-4 mr-1 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                                ${plan.destination}
+                            </p>` : ''}
+                        </div>
+                        <button onclick="handleDeletePlan('${plan.id}')"
+                            class="p-3 text-red-500 hover:text-red-700 transition duration-150 rounded-full hover:bg-red-50 border border-red-200"
+                            title="刪除此計畫">
+                            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M15 6V4c0-1-1-2-2-2h-2c-1 0-2 1-2 2v2"/></svg>
+                        </button>
+                    </div>
+                </header>
+                <div class="space-y-10">
+                    ${dayItinerariesHtml}
+                </div>
+            `;
+        }
+
+        /** 渲染旅遊計畫列表頁面 */
+        function renderPlanList() {
+            let planCardsHtml = '';
+
+            if (plans.length === 0) {
+                planCardsHtml = `
+                    <div class="col-span-full text-center py-10 bg-white rounded-xl shadow">
+                        <p class="text-xl text-gray-500">尚無旅遊計畫。點擊「新增計畫」開始規劃！</p>
+                    </div>
+                `;
+            } else {
+                planCardsHtml = plans.map(plan => `
+                    <div id="plan-card-${plan.id}" class="bg-white rounded-xl shadow-lg p-6 flex flex-col justify-between hover:shadow-xl transition duration-300 border-t-4 border-indigo-500">
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-800 mb-2">${plan.name}</h3>
+                            <div class="text-sm text-gray-500 space-y-1">
+                                <p class="flex items-center">
+                                    <svg class="w-4 h-4 mr-2 text-indigo-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                                    ${formatDate(plan.startDate)}
+                                </p>
+                                <p class="flex items-center">
+                                    <svg class="w-4 h-4 mr-2 text-indigo-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                                    ${formatDate(plan.endDate)}
+                                </p>
+                                ${plan.destination ? `
+                                <p class="flex items-center">
+                                    <svg class="w-4 h-4 mr-2 text-indigo-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                                    ${plan.destination}
+                                </p>` : ''}
+                            </div>
+                        </div>
+                        <div class="flex justify-end space-x-3 mt-4">
+                            <button data-plan-id="${plan.id}" onclick="event.stopPropagation(); handleDeletePlan('${plan.id}')"
+                                class="p-2 text-red-500 hover:text-red-700 transition duration-150 rounded-full hover:bg-red-50"
+                                title="刪除計畫">
+                                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M15 6V4c0-1-1-2-2-2h-2c-1 0-2 1-2 2v2"/></svg>
+                            </button>
+                            <button data-plan-id="${plan.id}" onclick="setActivePlan('${plan.id}')"
+                                class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-2 px-4 rounded-xl transition duration-300">
+                                查看行程
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            return `
+                <header class="flex justify-between items-center mb-6">
+                    <h1 class="text-3xl font-extrabold text-gray-900">我的旅遊計畫</h1>
+                    <button onclick="openAddPlanModal()"
+                        class="flex items-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-xl shadow-md transition duration-300 transform hover:scale-105">
+                        <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                        新增計畫
+                    </button>
+                </header>
+                <div class="bg-gray-200 border-l-4 border-gray-500 text-gray-800 p-3 rounded-lg mb-6">
+                    <p class="text-sm">當前用戶 ID (UID): <span class="font-mono text-xs bg-gray-300 p-1 rounded break-all">${currentUserId || 'N/A'}</span></p>
+                    <p class="text-xs text-red-600 mt-1">此 ID 應始終為固定用戶 <code>${HARDCODED_EMAIL}</code> 的 UID。</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    ${planCardsHtml}
+                </div>
+            `;
+        }
+
+
+        // --- 4. 核心應用程式與狀態管理 (Core App Logic) ---
+
+        /** 重新渲染應用程式主體，根據 activePlanId 顯示列表或詳情 */
+        window.renderApp = function() {
+            const appContainer = document.getElementById('app');
+            if (!appContainer) return;
+            
+            const activePlan = plans.find(p => p.id === activePlanId);
+
+            if (activePlanId && activePlan) {
+                appContainer.innerHTML = renderPlanDetail(activePlan);
+                // 必須重新填充行程 Modal 的日期選項
+                populateItineraryDates(activePlan);
+            } else {
+                appContainer.innerHTML = renderPlanList();
+            }
+        }
+
+        /** 設定活躍計畫 ID 並重新渲染 */
+        window.setActivePlan = function(planId) {
+            activePlanId = planId;
+            renderApp();
+        }
+
+        /** 訂閱旅遊計畫列表 (Firestore Realtime) */
+        function subscribeToPlans() {
+            if (!isAuthenticated || !currentUserId || !db) return;
+
+            const plansCollectionRef = collection(db, `artifacts/${appId}/users/${currentUserId}/travel_plans`);
+            const q = query(plansCollectionRef);
+
+            onSnapshot(q, (snapshot) => {
+                plans = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data(),
+                })).sort((a, b) => {
+                    // 在客戶端按建立時間倒序排序
+                    const dateA = a.createdAt?.toDate() || new Date(0);
+                    const dateB = b.createdAt?.toDate() || new Date(0);
+                    return dateB - dateA;
+                });
+                
+                // 每次資料更新時，重新渲染 App
+                renderApp();
+            }, (err) => {
+                console.error("Firestore 訂閱失敗:", err);
+                showMessage(`資料讀取失敗: ${err.message}`, true);
+            });
+        }
+
+
+        // --- 5. Modal 控制函數 (Modal Control) ---
+
+        /** 打開新增計畫 Modal */
+        function openAddPlanModal() {
+            document.getElementById('addPlanModal').classList.add('open');
+            document.getElementById('addPlanForm').reset();
+        }
+
+        /** 關閉新增計畫 Modal */
+        function closeAddPlanModal() {
+            document.getElementById('addPlanModal').classList.remove('open');
+        }
+
+        /** 填充新增行程 Modal 中的日期下拉選單 */
+        function populateItineraryDates(activePlan) {
+            const dateSelect = document.getElementById('itineraryDate');
+            if (!dateSelect) return;
+
+            datesArray = getDatesArray(activePlan.startDate, activePlan.endDate);
+            dateSelect.innerHTML = datesArray.map(d => 
+                `<option value="${d.date}">Day ${d.day} - ${formatDate(d.date)}</option>`
+            ).join('');
+        }
+        
+        /** 打開新增行程 Modal 並預設日期 */
+        window.openAddItineraryModal = function(preselectedDate = null) {
+            const modal = document.getElementById('addItineraryModal');
+            const dateSelect = document.getElementById('itineraryDate');
+            
+            // 確保日期下拉菜單中的值被正確預選
+            if (preselectedDate) {
+                dateSelect.value = preselectedDate;
+            } else if (datesArray.length > 0) {
+                 dateSelect.value = datesArray[0].date;
+            }
+            
+            modal.classList.add('open');
+            document.getElementById('addItineraryForm').reset();
+            // 由於重置會清空，需要重新設定日期
+            if (preselectedDate) {
+                 dateSelect.value = preselectedDate;
+            }
+        }
+
+        /** 關閉新增行程 Modal */
+        function closeAddItineraryModal() {
+            document.getElementById('addItineraryModal').classList.remove('open');
+        }
+
+
+        // --- 6. 事件監聽與初始化 (Event Listeners & Init) ---
+
+        /** 註冊表單提交事件 */
+        document.getElementById('addPlanForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const name = document.getElementById('planName').value.trim();
+            const destination = document.getElementById('planDestination').value.trim();
+            const startDate = document.getElementById('planStartDate').value;
+            const endDate = document.getElementById('planEndDate').value;
+
+            if (!name || !startDate || !endDate) {
+                showMessage('請填寫計畫名稱、開始日期和結束日期。', true);
+                return;
+            }
+
+            if (new Date(startDate) > new Date(endDate)) {
+                showMessage('開始日期不能晚於結束日期。', true);
+                return;
+            }
+
+            handleAddPlan({ name, destination, startDate, endDate });
+        });
+        
+        document.getElementById('addItineraryForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const activity = document.getElementById('itineraryActivity').value.trim();
+            const date = document.getElementById('itineraryDate').value;
+            const time = document.getElementById('itineraryTime').value;
+            const location = document.getElementById('itineraryLocation').value.trim();
+            const notes = document.getElementById('itineraryNotes').value.trim();
+
+            if (!activity || !date) {
+                showMessage('請填寫活動名稱和日期。', true);
+                return;
+            }
+
+            handleAddItinerary({ activity, date, time, location, notes });
+        });
+        
+        // 暴露給全局，以便在 HTML 屬性中調用 (onClick)
+        window.handleDeletePlan = handleDeletePlan;
+        window.handleDeleteItinerary = handleDeleteItinerary;
+        window.openAddPlanModal = openAddPlanModal;
+        window.closeAddPlanModal = closeAddPlanModal;
+        
+        /** 應用程式啟動與 Firebase 初始化 */
+        async function initializeAppAndFirebase() {
+            
+            try {
+                if (Object.keys(firebaseConfig).length === 0) {
+                    // 這只應在環境變數未設置時發生 (例如部署到外部平臺但忘記設定變數)
+                    throw new Error("Firebase 配置未提供。請檢查您是否在部署環境中正確設定了 FIREBASE_CONFIG 變數。");
+                }
+                setLogLevel('Debug');
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                // --- 認證流程: 嘗試以固定帳號登入/創建 ---
+                // 注意: 這裡使用硬編碼帳號是為了確保單用戶環境能夠穩定運行
+                try {
+                    console.log(`嘗試以硬編碼用戶 ${HARDCODED_EMAIL} 登入...`);
+                    await signInWithEmailAndPassword(auth, HARDCODED_EMAIL, HARDCODED_PASSWORD);
+
+                } catch (loginError) {
+                    console.warn(`登入失敗 (${loginError.code})。嘗試創建用戶...`);
+                    await createUserWithEmailAndPassword(auth, HARDCODED_EMAIL, HARDCODED_PASSWORD);
+                    console.log(`用戶 ${HARDCODED_EMAIL} 創建成功並已登入。`);
+                }
+
+                // --- 確認並設置用戶狀態 ---
+                const user = auth.currentUser;
+                if (user) {
+                    currentUserId = user.uid;
+                    isAuthenticated = true;
+                    console.log("固定用戶已設置。UID:", currentUserId);
+                    
+                    // 訂閱資料
+                    subscribeToPlans();
+                } else {
+                    throw new Error("認證流程完成，但用戶狀態無效。");
+                }
+
+                // --- 渲染應用程式 ---
+                renderApp(); 
+
+            } catch (e) {
+                console.error("應用程式初始化失敗:", e);
+                // 顯示錯誤訊息並停止執行
+                const appContainer = document.getElementById('app');
+                appContainer.innerHTML = `
+                    <div class="text-center bg-red-100 border-red-500 border-l-4 p-6 rounded-xl shadow-lg mt-8">
+                        <h2 class="text-xl font-bold text-red-700 mb-2">認證/初始化失敗</h2>
+                        <p class="text-gray-700">${e.message}</p>
+                        <p class="text-sm mt-4">請檢查 Firebase Console 中是否啟用了電子郵件/密碼登入，或者是否正確設定了部署環境變數。</p>
+                    </div>
+                `;
+            }
+        }
+
+        // 啟動應用程式
+        initializeAppAndFirebase();
+    </script>
+</body>
+</html>
