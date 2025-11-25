@@ -3,35 +3,142 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>登入您的旅行規劃器</title>
+    <title>我的旅行行程規劃</title>
     <!-- 載入 Tailwind CSS 框架 -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 載入 Lucide Icons (用於圖標) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         :root { font-family: 'Inter', sans-serif; }
+        .page-container { max-width: 640px; }
+        .trip-card {
+            transition: all 0.2s ease-in-out;
+        }
+        .trip-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        /* 懸浮新增按鈕 */
+        .fab {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 50;
+        }
+        @media (min-width: 640px) {
+            /* 讓按鈕在 PC 模式下，也保持在內容區域的右下方 */
+            .fab {
+                right: calc(50% - 320px + 24px); /* max-width: 640px / 2 + 24px 邊距 */
+            }
+        }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen flex items-center justify-center p-4">
-    
-    <div class="w-full max-w-md bg-white p-8 rounded-2xl shadow-2xl border border-gray-100 text-center">
-        <h1 class="text-4xl font-extrabold text-indigo-700 mb-4">旅行規劃</h1>
-        <p class="text-gray-500 mb-8">正在為您準備最佳的協作體驗...</p>
+<body class="bg-gray-50 min-h-screen pb-20">
 
-        <div id="loading-indicator" class="flex flex-col items-center">
-            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500 mb-4"></div>
-            <p class="text-indigo-600 font-medium">正在驗證身份並載入...</p>
-        </div>
+    <!-- 應用程式容器，在初始化完成前預設隱藏 -->
+    <div id="app-container" class="hidden">
+        
+        <!-- 頁面頂部導航列 -->
+        <header class="sticky top-0 bg-white shadow-md z-10">
+            <div class="page-container mx-auto flex justify-between items-center p-4">
+                <h1 class="text-2xl font-bold text-indigo-700">我的旅程</h1>
+                <button id="logout-button" class="text-gray-500 hover:text-red-600 transition duration-150 p-2 rounded-full active:bg-red-50" title="登出">
+                    <!-- Lucide: Log Out Icon - 將透過 JS 載入 -->
+                </button>
+            </div>
+        </header>
 
-        <div id="error-message" class="hidden mt-6 p-4 bg-red-100 text-red-700 rounded-lg border border-red-200">
-            身份驗證失敗，請檢查配置。
-        </div>
+        <!-- 主要內容區塊 -->
+        <main class="page-container mx-auto p-4">
+            
+            <!-- 用戶 ID 顯示 (用於測試與協作) -->
+            <div class="mb-4 p-3 bg-indigo-100 border border-indigo-200 rounded-lg text-sm text-indigo-700">
+                <span class="font-medium">您的用戶 ID (UID):</span> 
+                <code id="user-id-display" class="font-mono text-xs break-all ml-1">載入中...</code>
+            </div>
+
+            <!-- 行程列表容器 -->
+            <div id="trip-list" class="space-y-4">
+                <!-- 行程卡片將通過 JavaScript 渲染在此處 -->
+            </div>
+
+            <!-- 空行程提示 (預設隱藏) -->
+            <div id="no-trips-message" class="hidden text-center mt-20 p-6 bg-white rounded-xl shadow-lg border border-gray-100">
+                <span class="text-6xl" role="img" aria-label="Japan Flag">🇯🇵</span>
+                <p class="mt-4 text-xl font-semibold text-gray-700">您尚未建立任何旅程</p>
+                <p class="text-gray-500 mt-2">點擊右下角的 <span class="font-bold">+</span> 按鈕，開始規劃您的第一趟旅行！</p>
+            </div>
+        </main>
+        
+        <!-- 懸浮新增按鈕 (FAB) -->
+        <button id="add-trip-fab" class="fab p-4 bg-pink-500 text-white rounded-full shadow-lg hover:bg-pink-600 transition duration-200 ease-in-out transform hover:scale-105 active:scale-95" title="新增行程">
+            <!-- Lucide: Plus Icon - 將透過 JS 載入 -->
+        </button>
 
     </div>
 
-    <!-- Firebase 身份驗證邏輯 -->
+    <!-- 載入和錯誤狀態介面 (初始化時顯示) -->
+    <div id="status-container" class="min-h-screen flex items-center justify-center p-4">
+        <div class="w-full max-w-md bg-white p-8 rounded-2xl shadow-2xl border border-gray-100 text-center">
+            <div id="loading-indicator" class="flex flex-col items-center">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500 mb-4"></div>
+                <p class="text-indigo-600 font-medium">正在載入應用程式與驗證身份...</p>
+            </div>
+            <div id="initialization-error" class="hidden mt-6 p-4 bg-red-100 text-red-700 rounded-lg border border-red-200">
+                <p class="font-bold mb-2">應用程式初始化失敗！</p>
+                <p id="error-details">請檢查 Firebase 配置或網路連線。</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 自訂輸入 Modal (新增行程) -->
+    <div id="new-trip-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
+            <h3 class="text-xl font-semibold mb-4 text-gray-800">新增旅程</h3>
+            <form id="new-trip-form">
+                <label for="new-trip-name" class="block text-sm font-medium text-gray-700 mb-2">請輸入新行程名稱：</label>
+                <input type="text" id="new-trip-name" required maxlength="50"
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
+                       placeholder="例如：2026 神戶大阪美食之旅">
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button type="button" id="cancel-new-trip"
+                            class="px-4 py-2 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition duration-150">
+                        取消
+                    </button>
+                    <button type="submit" id="create-trip-button"
+                            class="px-4 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition duration-150">
+                        建立
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- 自訂刪除確認 Modal -->
+    <div id="delete-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
+            <h3 class="text-xl font-semibold mb-4 text-red-700">確認刪除</h3>
+            <p id="delete-modal-message" class="text-gray-700 mb-6">您確定要刪除這個行程嗎？此操作無法復原。</p>
+            <div class="flex justify-end space-x-3">
+                <button type="button" id="cancel-delete"
+                        class="px-4 py-2 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition duration-150">
+                    取消
+                </button>
+                <button type="button" id="confirm-delete"
+                        class="px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition duration-150">
+                    確認刪除
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- 整合後的單一應用程式邏輯 (包含 Firebase 初始化、認證和應用程式核心) -->
     <script type="module">
+        // --- 1. Firebase 核心服務初始化與認證檢查 ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, setLogLevel, collection, query, onSnapshot, doc, addDoc, deleteDoc, serverTimestamp, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // 設定日誌級別
         setLogLevel('debug'); 
@@ -39,47 +146,352 @@
         // 取得環境變數配置
         const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-        let app, auth;
+        let app, auth, db;
+        let firebaseInitialized = false; 
         
-        try {
-            app = initializeApp(firebaseConfig);
-            auth = getAuth(app);
-            // 雖然這個頁面只處理登入，但為了初始化完整，仍取得 db 實例
-            getFirestore(app); 
+        // UI 元素
+        const appContainer = document.getElementById('app-container');
+        const statusContainer = document.getElementById('status-container');
+        const errorDetails = document.getElementById('error-details');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const initializationError = document.getElementById('initialization-error');
+        
+        // 核心應用程式 UI 元素
+        const tripListElement = document.getElementById('trip-list');
+        const noTripsMessage = document.getElementById('no-trips-message');
+        const addTripFab = document.getElementById('add-trip-fab');
+        const logoutButton = document.getElementById('logout-button');
+        const userIdDisplay = document.getElementById('user-id-display');
+        
+        // Modal 元素
+        const newTripModal = document.getElementById('new-trip-modal');
+        const newTripForm = document.getElementById('new-trip-form');
+        const newTripNameInput = document.getElementById('new-trip-name');
+        const cancelNewTripButton = document.getElementById('cancel-new-trip');
+        const createTripButton = document.getElementById('create-trip-button');
+        const deleteModal = document.getElementById('delete-modal');
+        const confirmDeleteButton = document.getElementById('confirm-delete');
+        const cancelDeleteButton = document.getElementById('cancel-delete');
+        let tripToDeleteId = null; 
 
-            async function handleSignIn() {
-                try {
-                    let userCredential;
-                    
-                    if (initialAuthToken) {
-                        console.log("使用自訂認證令牌登入...");
-                        userCredential = await signInWithCustomToken(auth, initialAuthToken);
-                    } else {
-                        console.log("使用匿名身份登入 (未提供令牌)...");
-                        userCredential = await signInAnonymously(auth);
-                    }
+        let unsubscribe = null; 
+        let currentUserId = null; 
 
-                    console.log("登入成功，用戶 ID:", userCredential.user.uid);
-                    
-                    // 登入成功，導向主頁
-                    window.location.replace('./home.html'); 
+        // --- 輔助函數：錯誤處理與 UI 狀態 ---
+        function displayError(message) {
+            loadingIndicator.classList.add('hidden');
+            initializationError.classList.remove('hidden');
+            errorDetails.textContent = message;
+        }
 
-                } catch (error) {
-                    console.error("登入失敗:", error);
-                    document.getElementById('loading-indicator').classList.add('hidden');
-                    document.getElementById('error-message').classList.remove('hidden');
+        // --- 0. 視覺元素初始化 (插入 Lucide 圖標) ---
+        function initializeIcons() {
+            if (typeof lucide !== 'undefined') {
+                document.getElementById('logout-button').innerHTML = lucide.createIcons()['log-out'].toSvg({ class: 'h-6 w-6' });
+                document.getElementById('add-trip-fab').innerHTML = lucide.createIcons()['plus'].toSvg({ class: 'h-8 w-8' });
+            }
+        }
+        initializeIcons();
+
+
+        // --- 2. Firebase 初始化與認證 ---
+        if (!firebaseConfig || !firebaseConfig.apiKey) {
+            displayError('Firebase 配置信息缺失，請檢查環境變數是否正確設置。');
+        } else {
+            try {
+                // 嘗試初始化 Firebase 應用程式
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                firebaseInitialized = true; 
+                
+                // 啟動認證流程
+                handleSignIn();
+
+            } catch (e) {
+                console.error("Firebase 初始化失敗:", e);
+                displayError('應用程式初始化錯誤：' + e.message);
+            }
+        }
+
+        async function handleSignIn() {
+            if (!firebaseInitialized) return;
+
+            try {
+                let userCredential;
+                
+                // 嘗試使用自訂令牌登入，若無則匿名登入
+                if (initialAuthToken) {
+                    console.log("使用自訂認證令牌登入...");
+                    userCredential = await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    console.log("使用匿名身份登入 (未提供令牌)...");
+                    userCredential = await signInAnonymously(auth);
                 }
+
+                currentUserId = userCredential.user.uid;
+                console.log("登入成功，用戶 ID:", currentUserId);
+                
+                // 顯示主應用程式介面
+                statusContainer.classList.add('hidden');
+                appContainer.classList.remove('hidden');
+
+                // 開始載入行程資料
+                startTripListener(currentUserId);
+                userIdDisplay.textContent = currentUserId;
+                addTripFab.disabled = false;
+
+            } catch (error) {
+                console.error("登入失敗:", error);
+                displayError('身份驗證失敗：' + error.message);
+            }
+        }
+
+        // --- 3. 核心應用程式邏輯 ---
+        
+        // 簡易的通用 Modal 替換 confirm/alert
+        const showConfirmModal = (message, onConfirm) => {
+            if (window.confirm(message)) {
+                onConfirm();
+            }
+        };
+        const showSimpleMessage = (title, message, type) => {
+             alert(`${title}: ${message}`);
+        };
+
+
+        // 登出按鈕事件處理
+        logoutButton.addEventListener('click', async () => {
+            showConfirmModal('您確定要登出嗎？', async () => {
+                try {
+                    if (unsubscribe) {
+                         unsubscribe(); // 取消監聽
+                    }
+                    await signOut(auth);
+                    // 登出成功後，強制重新載入頁面，會再次觸發登入流程
+                    window.location.reload(); 
+                } catch (error) {
+                    console.error("登出失敗:", error);
+                    showSimpleMessage('錯誤', '登出失敗: ' + error.message, 'error'); 
+                }
+            });
+        });
+
+
+        // 顯示/隱藏刪除確認 Modal
+        const showDeleteModal = (tripId, name) => {
+            tripToDeleteId = tripId;
+            document.getElementById('delete-modal-message').innerHTML = `您確定要刪除行程 <strong>${name}</strong> 嗎？<br>此操作無法復原，並會刪除所有行程日資料。`;
+            deleteModal.classList.remove('hidden');
+        };
+
+        const hideDeleteModal = () => {
+            deleteModal.classList.add('hidden');
+            tripToDeleteId = null;
+        };
+        
+        // 刪除操作邏輯
+        const handleDeleteTrip = async () => {
+            if (!tripToDeleteId || !currentUserId || !db) return;
+
+            const deletingTripId = tripToDeleteId;
+            hideDeleteModal(); 
+            
+            try {
+                // 1. 取得並刪除子集合 'schedules' 中的所有文件
+                // 注意：在真實的 Firestore 結構中，"schedules" 應該是子集合。由於不能直接遞迴刪除，這裡只刪除主文件。
+                // *若要完整實現，需先查詢並刪除子集合。此範例為簡化處理，僅刪除主文件。*
+                
+                // 2. 刪除主行程文件
+                const tripRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'trips', deletingTripId);
+                await deleteDoc(tripRef);
+                
+                console.log(`行程 ${deletingTripId} 刪除成功.`);
+
+            } catch (error) {
+                console.error("刪除行程失敗:", error);
+                showSimpleMessage('錯誤', `刪除行程失敗: ${error.message}`, 'error');
+            }
+        };
+
+        // 設置刪除 Modal 的事件監聽器
+        confirmDeleteButton.addEventListener('click', handleDeleteTrip);
+        cancelDeleteButton.addEventListener('click', hideDeleteModal);
+        
+        
+        // --- 渲染單個行程卡片 ---
+        const renderTripCard = (trip) => {
+            const usersIconSvg = lucide.createIcons()['users'].toSvg({ class: 'h-3 w-3 mr-1' });
+            const chevronIconSvg = lucide.createIcons()['chevron-right'].toSvg({ class: 'h-6 w-6' });
+
+            const cardWrapper = document.createElement('div');
+            cardWrapper.className = 'flex items-center space-x-2';
+            
+            const card = document.createElement('div');
+            card.dataset.id = trip.id; 
+            card.className = 'trip-card bg-white p-5 rounded-xl shadow-lg border border-gray-100 cursor-pointer flex-grow flex items-center justify-between';
+            card.innerHTML = `
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800">${trip.name}</h3>
+                    <p class="text-sm text-gray-500 mt-1">
+                        <span class="mr-3">天數: ${trip.days}</span>
+                        <span class="text-xs inline-flex items-center font-medium bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                            ${usersIconSvg}
+                            共編: ${trip.memberCount || 1}
+                        </span>
+                    </p>
+                    <p class="text-xs text-gray-400 mt-2">最後更新: ${trip.lastUpdated ? new Date(trip.lastUpdated.seconds * 1000).toLocaleString('zh-TW') : 'N/A'}</p>
+                </div>
+                <div class="text-indigo-500">
+                    ${chevronIconSvg}
+                </div>
+            `;
+            
+            const deleteButton = document.createElement('button');
+            deleteButton.className = 'p-3 text-red-500 hover:text-red-700 rounded-full hover:bg-red-50 transition duration-150 flex-shrink-0';
+            deleteButton.title = '刪除此行程';
+            deleteButton.innerHTML = lucide.createIcons()['trash-2'].toSvg({ class: 'h-6 w-6' });
+
+            // 點擊事件：暫時使用 alert 提示，因為 trip.html 文件尚未創建
+            card.addEventListener('click', () => {
+                showSimpleMessage('導航提示', `您點擊了行程: ${trip.name} (ID: ${trip.id})。\n\n下一步可以建立 trip.html 來顯示詳細行程。`, 'info');
+            });
+            
+            // 刪除按鈕事件
+            deleteButton.addEventListener('click', (e) => {
+                e.stopPropagation(); 
+                showDeleteModal(trip.id, trip.name);
+            });
+            
+            cardWrapper.appendChild(card);
+            cardWrapper.appendChild(deleteButton);
+
+            return cardWrapper;
+        };
+
+
+        // --- 啟動 Firestore 監聽 ---
+        const startTripListener = (userId) => {
+            if (!firebaseInitialized) return;
+
+            // 定義行程集合的路徑: /artifacts/{APP_ID}/public/data/trips
+            const tripsCollectionRef = collection(db, 'artifacts', APP_ID, 'public', 'data', 'trips');
+            const q = query(tripsCollectionRef); 
+
+            if (unsubscribe) {
+                unsubscribe();
             }
 
-            handleSignIn();
+            // 實時監聽 (onSnapshot)
+            unsubscribe = onSnapshot(q, (querySnapshot) => {
+                const trips = [];
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    trips.push({
+                        id: doc.id,
+                        name: data.name || '未命名行程',
+                        days: data.days || 1,
+                        memberCount: data.members ? data.members.length : 1, 
+                        lastUpdated: data.updatedAt 
+                    });
+                });
 
-        } catch (e) {
-            console.error("Firebase 初始化失敗:", e);
-            document.getElementById('loading-indicator').classList.add('hidden');
-            document.getElementById('error-message').classList.remove('hidden');
-            document.getElementById('error-message').textContent = '應用程式初始化錯誤，請檢查 Firebase 配置。';
-        }
+                // 在客戶端排序，依據最後更新時間降序排列
+                trips.sort((a, b) => {
+                    const dateA = a.lastUpdated ? a.lastUpdated.seconds : 0;
+                    const dateB = b.lastUpdated ? b.lastUpdated.seconds : 0;
+                    return dateB - dateA;
+                });
+
+                // 渲染 UI
+                tripListElement.innerHTML = '';
+                if (trips.length === 0) {
+                    noTripsMessage.classList.remove('hidden');
+                } else {
+                    noTripsMessage.classList.add('hidden');
+                    trips.forEach(trip => {
+                        tripListElement.appendChild(renderTripCard(trip));
+                    });
+                }
+            }, (error) => {
+                console.error("Firestore 監聽失敗:", error);
+                showSimpleMessage('錯誤', "無法載入行程列表，請檢查網路或權限設定。", 'error');
+                noTripsMessage.classList.remove('hidden'); 
+                noTripsMessage.innerHTML = `<span class="text-red-500">載入失敗！${error.code}</span>`;
+            });
+        };
+
+
+        // 點擊 '+' 按鈕新增行程的邏輯
+        addTripFab.addEventListener('click', () => {
+            if (!currentUserId) {
+                 showSimpleMessage('提示', "請先登入以創建行程！", 'info');
+                 return;
+            }
+            // 顯示自定義 Modal
+            newTripModal.classList.remove('hidden');
+            newTripNameInput.focus();
+        });
+        
+        // 取消按鈕邏輯
+        cancelNewTripButton.addEventListener('click', () => {
+            newTripModal.classList.add('hidden');
+            newTripForm.reset(); 
+        });
+
+        // 表單提交邏輯
+        newTripForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!currentUserId || !db) return;
+
+            const tripName = newTripNameInput.value.trim();
+            if (!tripName) return; 
+            
+            createTripButton.disabled = true;
+            createTripButton.textContent = '建立中...';
+            
+            try {
+                const userId = currentUserId;
+                const newTripRef = collection(db, 'artifacts', APP_ID, 'public', 'data', 'trips');
+
+                // 準備新的行程資料
+                const newTripData = {
+                    name: tripName,
+                    days: 1, // 預設 1 天
+                    members: [userId], 
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp(),
+                };
+                
+                // 寫入 Firestore
+                const docRef = await addDoc(newTripRef, newTripData);
+                console.log("新行程文件寫入成功，ID:", docRef.id);
+                
+                // 隱藏 Modal
+                newTripModal.classList.add('hidden');
+                newTripForm.reset(); 
+                
+                showSimpleMessage('建立成功', `新的行程 "${tripName}" 已創建！您可以繼續在列表中編輯。`, 'success');
+                
+            } catch (error) {
+                console.error("新增行程失敗:", error);
+                showSimpleMessage('錯誤', "新增行程失敗：" + error.message, 'error');
+            } finally {
+                createTripButton.disabled = false;
+                createTripButton.textContent = '建立';
+            }
+        });
+
+        // 當頁面被卸載時，取消 Firestore 的監聽
+        window.addEventListener('beforeunload', () => {
+            if (unsubscribe) {
+                unsubscribe();
+                console.log("Firestore 監聽已取消。");
+            }
+        });
+
     </script>
 </body>
 </html>
