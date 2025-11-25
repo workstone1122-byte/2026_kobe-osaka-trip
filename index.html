@@ -40,8 +40,7 @@
         <div class="page-container mx-auto flex justify-between items-center p-4">
             <h1 class="text-2xl font-bold text-indigo-700">我的旅程</h1>
             <button id="logout-button" class="text-gray-500 hover:text-red-600 transition duration-150 p-2 rounded-full active:bg-red-50" title="登出">
-                <!-- Lucide: Log Out Icon -->
-                <script>document.write(lucide.createIcons()['log-out'].toSvg({ class: 'h-6 w-6' }));</script>
+                <!-- Lucide: Log Out Icon - 將透過 JS 載入 -->
             </button>
         </div>
     </header>
@@ -70,8 +69,7 @@
     
     <!-- 懸浮新增按鈕 (FAB) -->
     <button id="add-trip-fab" class="fab p-4 bg-pink-500 text-white rounded-full shadow-lg hover:bg-pink-600 transition duration-200 ease-in-out transform hover:scale-105 active:scale-95" title="新增行程">
-        <!-- Lucide: Plus Icon -->
-        <script>document.write(lucide.createIcons()['plus'].toSvg({ class: 'h-8 w-8' }));</script>
+        <!-- Lucide: Plus Icon - 將透過 JS 載入 -->
     </button>
     
     <!-- 自訂輸入 Modal (取代 prompt()) -->
@@ -138,34 +136,10 @@
             db = getFirestore(app);
         } catch (e) {
             console.error("Firebase 初始化失敗:", e);
-            // 這裡不應跳轉，因為可能只是配置錯誤。
         }
 
         let unsubscribe = null; // 用於存放 Firestore 監聽器的取消函數
         let currentUserId = null; // 儲存當前用戶 ID
-        
-        // --- 2. 認證守衛邏輯 ---
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                // 用戶已登入，開始載入行程
-                currentUserId = user.uid;
-                console.log(`用戶已登入 (UID: ${currentUserId})，開始監聽行程。`);
-                // 由於已經登入，我們現在才啟動主要的 Firestore 監聽
-                startTripListener(currentUserId);
-                document.getElementById('user-id-display').textContent = currentUserId;
-                
-                // 確保所有按鈕可用
-                addTripFab.disabled = false;
-
-            } else {
-                // 用戶未登入，導向登入頁面
-                console.log("用戶未登入，導向 login.html。");
-                window.location.replace('./login.html'); 
-            }
-        });
-
-
-        // --- 3. 主要應用程式邏輯 ---
         
         // UI 元素
         const tripListElement = document.getElementById('trip-list');
@@ -188,6 +162,37 @@
         let tripToDeleteId = null; // 暫存要刪除的行程 ID
 
 
+        // --- 0. 視覺元素初始化 (插入 Lucide 圖標) ---
+        // 修正 Lucide 圖標的插入方式，避免 document.write 造成的渲染問題
+        if (typeof lucide !== 'undefined') {
+            document.getElementById('logout-button').innerHTML = lucide.createIcons()['log-out'].toSvg({ class: 'h-6 w-6' });
+            document.getElementById('add-trip-fab').innerHTML = lucide.createIcons()['plus'].toSvg({ class: 'h-8 w-8' });
+        }
+
+
+        // --- 2. 認證守衛邏輯 ---
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                // 用戶已登入，開始載入行程
+                currentUserId = user.uid;
+                console.log(`用戶已登入 (UID: ${currentUserId})，開始監聽行程。`);
+                // 由於已經登入，我們現在才啟動主要的 Firestore 監聽
+                startTripListener(currentUserId);
+                userIdDisplay.textContent = currentUserId;
+                
+                // 確保所有按鈕可用
+                addTripFab.disabled = false;
+
+            } else {
+                // 用戶未登入，導向登入頁面
+                console.log("用戶未登入，導向 login.html。");
+                window.location.replace('./login.html'); 
+            }
+        });
+
+
+        // --- 3. 主要應用程式邏輯 ---
+        
         // 登出按鈕事件處理
         logoutButton.addEventListener('click', async () => {
             // 這裡使用自定義 Modal 邏輯來取代 confirm()
@@ -261,17 +266,23 @@
         
         // 簡易的通用 Modal 替換 confirm/alert (為了簡潔，使用簡單的 JS confirm/alert 提示)
         const showConfirmModal = (title, message, onConfirm) => {
+            // 注意: 在生產環境中，請使用自定義 Modal UI 替代 window.confirm
             if (window.confirm(message)) {
                 onConfirm();
             }
         };
         const showSimpleMessage = (title, message, type) => {
+             // 注意: 在生產環境中，請使用自定義 Modal UI 替代 alert
              alert(`${title}: ${message}`);
         };
 
 
-        // --- 渲染單個行程卡片 ---
+        // --- 渲染單個行程卡片 (修正 Lucide 渲染問題) ---
         const renderTripCard = (trip) => {
+            // 預先生成 SVG 字串，避免使用 document.write
+            const usersIconSvg = lucide.createIcons()['users'].toSvg({ class: 'h-3 w-3 mr-1' });
+            const chevronIconSvg = lucide.createIcons()['chevron-right'].toSvg({ class: 'h-6 w-6' });
+
             const cardWrapper = document.createElement('div');
             cardWrapper.className = 'flex items-center space-x-2';
             
@@ -285,14 +296,14 @@
                     <p class="text-sm text-gray-500 mt-1">
                         <span class="mr-3">天數: ${trip.days}</span>
                         <span class="text-xs inline-flex items-center font-medium bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
-                            <script>document.write(lucide.createIcons()['users'].toSvg({ class: 'h-3 w-3 mr-1' }));</script>
+                            ${usersIconSvg}
                             共編: ${trip.memberCount || 1}
                         </span>
                     </p>
                     <p class="text-xs text-gray-400 mt-2">最後更新: ${trip.lastUpdated ? new Date(trip.lastUpdated.seconds * 1000).toLocaleString('zh-TW') : 'N/A'}</p>
                 </div>
                 <div class="text-indigo-500">
-                    <script>document.write(lucide.createIcons()['chevron-right'].toSvg({ class: 'h-6 w-6' }));</script>
+                    ${chevronIconSvg}
                 </div>
             `;
             
@@ -300,7 +311,8 @@
             const deleteButton = document.createElement('button');
             deleteButton.className = 'p-3 text-red-500 hover:text-red-700 rounded-full hover:bg-red-50 transition duration-150 flex-shrink-0';
             deleteButton.title = '刪除此行程';
-            deleteButton.innerHTML = `<script>document.write(lucide.createIcons()['trash-2'].toSvg({ class: 'h-6 w-6' }));</script>`;
+            // 直接插入 trash-2 圖標的 SVG
+            deleteButton.innerHTML = lucide.createIcons()['trash-2'].toSvg({ class: 'h-6 w-6' });
 
             // 點擊事件：導向到 trip.html
             card.addEventListener('click', () => {
