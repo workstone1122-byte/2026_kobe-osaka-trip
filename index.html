@@ -137,14 +137,26 @@
     <script type="module">
         // --- 1. Firebase 核心服務初始化與認證檢查 ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, setLogLevel, collection, query, onSnapshot, doc, addDoc, deleteDoc, serverTimestamp, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, setLogLevel, collection, query, onSnapshot, doc, addDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // 設定日誌級別
         setLogLevel('debug'); 
 
-        // 取得環境變數配置
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        // =======================================================
+        // 您的 Firebase 配置 (已手動替換)
+        // =======================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyBsMiLUgtJtcv48iRp_9QFx5fShtRd6Lro",
+            authDomain: "kobe-osaka-2026travel.firebaseapp.com",
+            projectId: "kobe-osaka-2026travel",
+            storageBucket: "kobe-osaka-2026travel.firebasestorage.app",
+            messagingSenderId: "772246724994",
+            appId: "1:772246724994:web:26c067ae1096d13ebdef9b"
+        };
+        // =======================================================
+        
+        // 環境變數
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
         const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
@@ -197,8 +209,8 @@
 
 
         // --- 2. Firebase 初始化與認證 ---
-        if (!firebaseConfig || !firebaseConfig.apiKey) {
-            displayError('Firebase 配置信息缺失，請檢查環境變數是否正確設置。');
+        if (!firebaseConfig.apiKey) {
+            displayError('Firebase 配置信息缺失 (apiKey)，無法啟動。');
         } else {
             try {
                 // 嘗試初始化 Firebase 應用程式
@@ -253,11 +265,13 @@
         
         // 簡易的通用 Modal 替換 confirm/alert
         const showConfirmModal = (message, onConfirm) => {
+            // 在 Canvas 環境中，我們使用 window.confirm 作為臨時替代
             if (window.confirm(message)) {
                 onConfirm();
             }
         };
         const showSimpleMessage = (title, message, type) => {
+             // 在 Canvas 環境中，我們使用 alert 作為臨時替代
              alert(`${title}: ${message}`);
         };
 
@@ -300,11 +314,7 @@
             hideDeleteModal(); 
             
             try {
-                // 1. 取得並刪除子集合 'schedules' 中的所有文件
-                // 注意：在真實的 Firestore 結構中，"schedules" 應該是子集合。由於不能直接遞迴刪除，這裡只刪除主文件。
-                // *若要完整實現，需先查詢並刪除子集合。此範例為簡化處理，僅刪除主文件。*
-                
-                // 2. 刪除主行程文件
+                // 刪除主行程文件 (在 Firestore 規則中，這應該會阻止刪除帶有子集合的文件，但我們目前假設只有頂層文件)
                 const tripRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'trips', deletingTripId);
                 await deleteDoc(tripRef);
                 
@@ -354,9 +364,9 @@
             deleteButton.title = '刪除此行程';
             deleteButton.innerHTML = lucide.createIcons()['trash-2'].toSvg({ class: 'h-6 w-6' });
 
-            // 點擊事件：暫時使用 alert 提示，因為 trip.html 文件尚未創建
+            // 點擊事件：暫時使用 alert 提示，因為詳細行程頁尚未創建
             card.addEventListener('click', () => {
-                showSimpleMessage('導航提示', `您點擊了行程: ${trip.name} (ID: ${trip.id})。\n\n下一步可以建立 trip.html 來顯示詳細行程。`, 'info');
+                showSimpleMessage('導航提示', `您點擊了行程: ${trip.name} (ID: ${trip.id})。\n\n下一步可以創建一個名為 trip.html 的新檔案來編輯詳細行程。`, 'info');
             });
             
             // 刪除按鈕事件
