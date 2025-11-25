@@ -198,14 +198,15 @@
          * 在部署到 GitHub/Netlify/Vercel 等公開平台時，**請務必**將下方 `firebaseConfig` 替換為您自己的實際值。
          * **請勿**將此檔案上傳到 GitHub 而未替換 YOUR_... 預留位置，或使用 Netlify 環境變數代替。
         */
-        const firebaseConfig = {
-            apiKey: "YOUR_API_KEY", // <-- 替換成您的 API 金鑰
-            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_PROJECT_ID.appspot.com",
-            messagingSenderId: "YOUR_SENDER_ID",
-            appId: "YOUR_APP_ID"
-        };
+        
+		const firebaseConfig = {
+		  apiKey: "AIzaSyBsMiLUgtJtcv48iRp_9QFx5fShtRd6Lro",
+		  authDomain: "kobe-osaka-2026travel.firebaseapp.com",
+		  projectId: "kobe-osaka-2026travel",
+		  storageBucket: "kobe-osaka-2026travel.firebasestorage.app",
+		  messagingSenderId: "772246724994",
+		  appId: "1:772246724994:web:26c067ae1096d13ebdef9b"
+		};
         
         // 使用 projectId 作為應用程式 ID 的替代品
         const appId = firebaseConfig.projectId || 'default-travel-planner';
