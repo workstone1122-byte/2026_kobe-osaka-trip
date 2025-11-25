@@ -3,150 +3,131 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>我的旅行行程規劃</title>
-    <!-- 載入 Tailwind CSS 框架 -->
+    <title>旅遊行程規劃器</title>
+    <!-- 引入 Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 載入 Lucide Icons (用於圖標) -->
-    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        :root { font-family: 'Inter', sans-serif; }
-        .page-container { max-width: 640px; }
-        .trip-card {
-            transition: all 0.2s ease-in-out;
+        /* 使用 Inter 字體以獲得更好的現代感 */
+        body {
+            font-family: 'Inter', sans-serif;
         }
-        .trip-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        /* 隱藏原生彈出式對話框，我們使用自定義 Modal */
+        .modal-overlay {
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.3s, visibility 0.3s;
         }
-        /* 懸浮新增按鈕 */
-        .fab {
-            position: fixed;
-            bottom: 24px;
-            right: 24px;
-            z-index: 50;
-        }
-        @media (min-width: 640px) {
-            /* 讓按鈕在 PC 模式下，也保持在內容區域的右下方 */
-            .fab {
-                right: calc(50% - 320px + 24px); /* max-width: 640px / 2 + 24px 邊距 */
-            }
+        .modal-overlay.open {
+            visibility: visible;
+            opacity: 1;
         }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen pb-20">
-
-    <!-- 應用程式容器，在初始化完成前預設隱藏 -->
-    <div id="app-container" class="hidden">
-        
-        <!-- 頁面頂部導航列 -->
-        <header class="sticky top-0 bg-white shadow-md z-10">
-            <div class="page-container mx-auto flex justify-between items-center p-4">
-                <h1 class="text-2xl font-bold text-indigo-700">我的旅程</h1>
-                <button id="logout-button" class="text-gray-500 hover:text-red-600 transition duration-150 p-2 rounded-full active:bg-red-50" title="登出">
-                    <!-- Lucide: Log Out Icon - 將透過 JS 載入 -->
-                </button>
-            </div>
-        </header>
-
-        <!-- 主要內容區塊 -->
-        <main class="page-container mx-auto p-4">
-            
-            <!-- 用戶 ID 顯示 (用於測試與協作) -->
-            <div class="mb-4 p-3 bg-indigo-100 border border-indigo-200 rounded-lg text-sm text-indigo-700">
-                <span class="font-medium">您的用戶 ID (UID):</span> 
-                <code id="user-id-display" class="font-mono text-xs break-all ml-1">載入中...</code>
-            </div>
-
-            <!-- 行程列表容器 -->
-            <div id="trip-list" class="space-y-4">
-                <!-- 行程卡片將通過 JavaScript 渲染在此處 -->
-            </div>
-
-            <!-- 空行程提示 (預設隱藏) -->
-            <div id="no-trips-message" class="hidden text-center mt-20 p-6 bg-white rounded-xl shadow-lg border border-gray-100">
-                <span class="text-6xl" role="img" aria-label="Japan Flag">🇯🇵</span>
-                <p class="mt-4 text-xl font-semibold text-gray-700">您尚未建立任何旅程</p>
-                <p class="text-gray-500 mt-2">點擊右下角的 <span class="font-bold">+</span> 按鈕，開始規劃您的第一趟旅行！</p>
-            </div>
-        </main>
-        
-        <!-- 懸浮新增按鈕 (FAB) -->
-        <button id="add-trip-fab" class="fab p-4 bg-pink-500 text-white rounded-full shadow-lg hover:bg-pink-600 transition duration-200 ease-in-out transform hover:scale-105 active:scale-95" title="新增行程">
-            <!-- Lucide: Plus Icon - 將透過 JS 載入 -->
-        </button>
-
-    </div>
-
-    <!-- 載入和錯誤狀態介面 (初始化時顯示) -->
-    <div id="status-container" class="min-h-screen flex items-center justify-center p-4">
-        <div class="w-full max-w-md bg-white p-8 rounded-2xl shadow-2xl border border-gray-100 text-center">
-            <div id="loading-indicator" class="flex flex-col items-center">
-                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500 mb-4"></div>
-                <p class="text-indigo-600 font-medium">正在載入應用程式與驗證身份...</p>
-            </div>
-            <div id="initialization-error" class="hidden mt-6 p-4 bg-red-100 text-red-700 rounded-lg border border-red-200">
-                <p class="font-bold mb-2">應用程式初始化失敗！</p>
-                <p id="error-details">請檢查 Firebase 配置或網路連線。</p>
-            </div>
+<body class="bg-gray-100 min-h-screen">
+    <div id="app" class="p-4 sm:p-8">
+        <!-- 應用程式內容將由 JavaScript 動態插入 -->
+        <div class="flex items-center justify-center min-h-screen">
+            <p class="text-lg font-semibold text-indigo-600">載入中... 正在連接 Firebase...</p>
         </div>
     </div>
-    
-    <!-- 自訂輸入 Modal (新增行程) -->
-    <div id="new-trip-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
-            <h3 class="text-xl font-semibold mb-4 text-gray-800">新增旅程</h3>
-            <form id="new-trip-form">
-                <label for="new-trip-name" class="block text-sm font-medium text-gray-700 mb-2">請輸入新行程名稱：</label>
-                <input type="text" id="new-trip-name" required maxlength="50"
-                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
-                       placeholder="例如：2026 神戶大阪美食之旅">
-                <div class="mt-6 flex justify-end space-x-3">
-                    <button type="button" id="cancel-new-trip"
-                            class="px-4 py-2 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition duration-150">
+
+    <!-- Modal for Adding/Editing Plan -->
+    <div id="addPlanModal" class="modal-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6">
+            <div class="flex justify-between items-center mb-4 border-b pb-3">
+                <h2 class="text-2xl font-bold text-gray-800" id="planModalTitle">新增旅遊計畫</h2>
+                <button onclick="closeAddPlanModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <form id="addPlanForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">計畫名稱*</label>
+                    <input type="text" id="planName" class="mt-1 block w-full border border-gray-300 rounded-lg p-3 shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">目的地 (可選)</label>
+                    <input type="text" id="planDestination" class="mt-1 block w-full border border-gray-300 rounded-lg p-3 shadow-sm focus:ring-indigo-500 focus:border-indigo-500" />
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">開始日期*</label>
+                        <input type="date" id="planStartDate" class="mt-1 block w-full border border-gray-300 rounded-lg p-3 shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">結束日期*</label>
+                        <input type="date" id="planEndDate" class="mt-1 block w-full border border-gray-300 rounded-lg p-3 shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required />
+                    </div>
+                </div>
+                <div class="pt-4 flex justify-end space-x-3">
+                    <button type="button" onclick="closeAddPlanModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition">
                         取消
                     </button>
-                    <button type="submit" id="create-trip-button"
-                            class="px-4 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition duration-150">
-                        建立
+                    <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition shadow-md">
+                        建立計畫
                     </button>
                 </div>
             </form>
         </div>
     </div>
-    
-    <!-- 自訂刪除確認 Modal -->
-    <div id="delete-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm">
-            <h3 class="text-xl font-semibold mb-4 text-red-700">確認刪除</h3>
-            <p id="delete-modal-message" class="text-gray-700 mb-6">您確定要刪除這個行程嗎？此操作無法復原。</p>
-            <div class="flex justify-end space-x-3">
-                <button type="button" id="cancel-delete"
-                        class="px-4 py-2 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition duration-150">
-                    取消
-                </button>
-                <button type="button" id="confirm-delete"
-                        class="px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition duration-150">
-                    確認刪除
+
+    <!-- Modal for Adding Itinerary -->
+    <div id="addItineraryModal" class="modal-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6">
+            <div class="flex justify-between items-center mb-4 border-b pb-3">
+                <h2 class="text-2xl font-bold text-gray-800">新增行程卡片</h2>
+                <button onclick="closeAddItineraryModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
                 </button>
             </div>
+            <form id="addItineraryForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">活動名稱*</label>
+                    <input type="text" id="itineraryActivity" class="mt-1 block w-full border border-gray-300 rounded-lg p-3 shadow-sm focus:ring-emerald-500 focus:border-emerald-500" required />
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">選擇日期*</label>
+                        <select id="itineraryDate" class="mt-1 block w-full border border-gray-300 rounded-lg p-3 shadow-sm focus:ring-emerald-500 focus:border-emerald-500" required>
+                            <!-- Options will be populated by JS -->
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">時間 (可選)</label>
+                        <input type="time" id="itineraryTime" class="mt-1 block w-full border border-gray-300 rounded-lg p-3 shadow-sm focus:ring-emerald-500 focus:border-emerald-500" />
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">地點 (可選)</label>
+                    <input type="text" id="itineraryLocation" class="mt-1 block w-full border border-gray-300 rounded-lg p-3 shadow-sm focus:ring-emerald-500 focus:border-emerald-500" />
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">備註/筆記 (可選)</label>
+                    <textarea id="itineraryNotes" rows="3" class="mt-1 block w-full border border-gray-300 rounded-lg p-3 shadow-sm focus:ring-emerald-500 focus:border-emerald-500"></textarea>
+                </div>
+
+                <div class="pt-4 flex justify-end space-x-3">
+                    <button type="button" onclick="closeAddItineraryModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition">
+                        取消
+                    </button>
+                    <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition shadow-md">
+                        儲存行程
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
 
-    <!-- 整合後的單一應用程式邏輯 (包含 Firebase 初始化、認證和應用程式核心) -->
     <script type="module">
-        // --- 1. Firebase 核心服務初始化與認證檢查 ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        // 導入 Email/Password 登入功能
-        import { getAuth, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, setLogLevel, collection, query, onSnapshot, doc, addDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, addDoc, updateDoc, deleteDoc, onSnapshot, collection, query, orderBy, serverTimestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // 設定日誌級別
-        setLogLevel('debug'); 
-
-        // =======================================================
-        // 您的 Firebase 配置
-        // =======================================================
+        // --- Firebase Configuration (Hardcoded for GitHub Pages) ---
         const firebaseConfig = {
             apiKey: "AIzaSyBsMiLUgtJtcv48iRp_9QFx5fShtRd6Lro",
             authDomain: "kobe-osaka-2026travel.firebaseapp.com",
@@ -155,354 +136,560 @@
             messagingSenderId: "772246724994",
             appId: "1:772246724994:web:26c067ae1096d13ebdef9b"
         };
-        // =======================================================
         
-        // =======================================================
-        // *** 測試專用憑證 (已硬編碼到程式碼中) ***
-        // =======================================================
-        const TEST_EMAIL = "test@team.com";
-        const TEST_PASSWORD = "password123";
-        // =======================================================
+        // 使用 projectId 作為 Firestore 路徑中的應用程式 ID
+        const appId = firebaseConfig.projectId;
 
-        // 環境變數
-        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-        let app, auth, db;
-        let firebaseInitialized = false; 
-        
-        // UI 元素
-        const appContainer = document.getElementById('app-container');
-        const statusContainer = document.getElementById('status-container');
-        const errorDetails = document.getElementById('error-details');
-        const loadingIndicator = document.getElementById('loading-indicator');
-        const initializationError = document.getElementById('initialization-error');
-        
-        // 核心應用程式 UI 元素
-        const tripListElement = document.getElementById('trip-list');
-        const noTripsMessage = document.getElementById('no-trips-message');
-        const addTripFab = document.getElementById('add-trip-fab');
-        const logoutButton = document.getElementById('logout-button');
-        const userIdDisplay = document.getElementById('user-id-display');
-        
-        // Modal 元素
-        const newTripModal = document.getElementById('new-trip-modal');
-        const newTripForm = document.getElementById('new-trip-form');
-        const newTripNameInput = document.getElementById('new-trip-name');
-        const cancelNewTripButton = document.getElementById('cancel-new-trip');
-        const createTripButton = document.getElementById('create-trip-button');
-        const deleteModal = document.getElementById('delete-modal');
-        const confirmDeleteButton = document.getElementById('confirm-delete');
-        const cancelDeleteButton = document.getElementById('cancel-delete');
-        let tripToDeleteId = null; 
+        // --- Global State Variables ---
+        let db = null;
+        let auth = null;
+        let currentUserId = null;
+        let isAuthenticated = false;
+        let plans = [];
+        let activePlanId = null;
+        let datesArray = []; // Store dates for active plan
 
-        let unsubscribe = null; 
-        let currentUserId = null; 
 
-        // --- 輔助函數：錯誤處理與 UI 狀態 ---
-        function displayError(message) {
-            loadingIndicator.classList.add('hidden');
-            initializationError.classList.remove('hidden');
-            errorDetails.textContent = message;
-        }
+        // --- Helper Functions ---
 
-        // --- 0. 視覺元素初始化 (插入 Lucide 圖標) ---
-        function initializeIcons() {
-            if (typeof lucide !== 'undefined') {
-                document.getElementById('logout-button').innerHTML = lucide.createIcons()['log-out'].toSvg({ class: 'h-6 w-6' });
-                document.getElementById('add-trip-fab').innerHTML = lucide.createIcons()['plus'].toSvg({ class: 'h-8 w-8' });
+        /**
+         * 將日期字串格式化為 "YYYY/MM/DD (週X)"
+         * @param {string} dateString - 格式為 YYYY-MM-DD 的日期字串
+         */
+        function formatDate(dateString) {
+            if (!dateString) return '日期未定';
+            try {
+                const date = new Date(dateString);
+                // 處理時區問題，確保日期正確
+                date.setMinutes(date.getMinutes() + date.getTimezoneOffset()); 
+
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+                const weekday = weekdays[date.getDay()];
+                return `${year}/${month}/${day} (週${weekday})`;
+            } catch (error) {
+                console.error("日期格式化錯誤:", error);
+                return dateString;
             }
         }
-        initializeIcons();
 
+        /**
+         * 計算兩個日期之間的天數（含起訖日）
+         * @param {string} start - 開始日期 (YYYY-MM-DD)
+         * @param {string} end - 結束日期 (YYYY-MM-DD)
+         * @returns {Array<{date: string, day: number}>} - 包含日期和天數編號的陣列
+         */
+        function getDatesArray(start, end) {
+            const dates = [];
+            // 確保日期是 UTC 午夜，避免時區偏差
+            let currentDate = new Date(start + 'T00:00:00');
+            const endDate = new Date(end + 'T00:00:00');
+            let dayCount = 1;
 
-        // --- 2. Firebase 初始化與認證 ---
-        if (!firebaseConfig.apiKey) {
-            displayError('Firebase 配置信息缺失 (apiKey)，無法啟動。');
-        } else {
+            while (currentDate <= endDate) {
+                dates.push({
+                    date: currentDate.toISOString().split('T')[0],
+                    day: dayCount
+                });
+                currentDate.setDate(currentDate.getDate() + 1);
+                dayCount++;
+            }
+            return dates;
+        }
+
+        /**
+         * 獲取 Firestore 文件參考路徑
+         * @param {string} planId - 旅遊計畫 ID
+         */
+        function getPlanDocRef(planId) {
+            if (!db || !currentUserId) throw new Error("Firebase 未初始化或用戶 ID 未知");
+            // 使用 /artifacts/{appId}/users/{userId}/travel_plans 路徑
+            return doc(db, `artifacts/${appId}/users/${currentUserId}/travel_plans`, planId);
+        }
+
+        /**
+         * 顯示自定義錯誤訊息 (取代 alert)
+         * @param {string} message - 訊息內容
+         */
+        function showMessage(message, isError = false) {
+            const app = document.getElementById('app');
+            const existingMessage = document.getElementById('appMessage');
+            if (existingMessage) existingMessage.remove();
+
+            const className = isError 
+                ? 'bg-red-100 border-red-400 text-red-700' 
+                : 'bg-green-100 border-green-400 text-green-700';
+
+            const messageHtml = `
+                <div id="appMessage" class="${className} border-l-4 p-4 rounded-lg shadow-md mb-6 transition-all duration-300">
+                    <p class="font-bold">${isError ? '錯誤' : '通知'}</p>
+                    <p>${message}</p>
+                </div>
+            `;
+            // 插入到 App 容器的頂部
+            app.insertAdjacentHTML('afterbegin', messageHtml);
+            // 3 秒後自動消失
+            setTimeout(() => {
+                document.getElementById('appMessage')?.classList.add('opacity-0');
+                setTimeout(() => document.getElementById('appMessage')?.remove(), 300);
+            }, 3000);
+        }
+
+        // --- Firebase CRUD Operations ---
+
+        /** 新增旅遊計畫 */
+        async function handleAddPlan(planData) {
+            if (!db || !currentUserId) return;
+
             try {
-                // 嘗試初始化 Firebase 應用程式
-                app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
+                await addDoc(collection(db, `artifacts/${appId}/users/${currentUserId}/travel_plans`), {
+                    ...planData,
+                    userId: currentUserId,
+                    itineraries: [], // 初始行程為空陣列
+                    createdAt: serverTimestamp()
+                });
+                closeAddPlanModal();
+                showMessage('旅遊計畫建立成功！');
+            } catch (e) {
+                console.error("新增計畫失敗:", e);
+                showMessage(`新增計畫失敗: ${e.message}`, true);
+            }
+        }
+
+        /** 刪除旅遊計畫 */
+        async function handleDeletePlan(planId) {
+            if (!db || !currentUserId) return;
+
+            if (!window.confirm('確定要刪除此旅遊計畫嗎？')) return; 
+            
+            try {
+                await deleteDoc(getPlanDocRef(planId));
+                activePlanId = null; // 如果刪除當前計畫，則返回列表
+                showMessage('旅遊計畫已刪除。');
+            } catch (e) {
+                console.error("刪除計畫失敗:", e);
+                showMessage(`刪除計畫失敗: ${e.message}`, true);
+            }
+        }
+
+        /** 新增行程卡片 */
+        async function handleAddItinerary(itineraryData) {
+            if (!activePlanId) return;
+
+            try {
+                const planDocRef = getPlanDocRef(activePlanId);
+                const planDoc = await getDoc(planDocRef);
+                if (!planDoc.exists()) {
+                    throw new Error("找不到旅遊計畫。");
+                }
+
+                const currentItineraries = planDoc.data().itineraries || [];
+                const newItinerary = {
+                    id: crypto.randomUUID(), // 使用 UUID 確保唯一性
+                    ...itineraryData,
+                    order: currentItineraries.length + 1, // 簡單排序
+                    notes: itineraryData.notes || '無備註'
+                };
+
+                await updateDoc(planDocRef, {
+                    itineraries: [...currentItineraries, newItinerary]
+                });
+
+                closeAddItineraryModal();
+                showMessage('行程卡片新增成功！');
+
+            } catch (e) {
+                console.error("新增行程失敗:", e);
+                showMessage(`新增行程失敗: ${e.message}`, true);
+            }
+        }
+
+        /** 刪除行程卡片 */
+        async function handleDeleteItinerary(itineraryId) {
+            if (!activePlanId) return;
+
+            try {
+                const planDocRef = getPlanDocRef(activePlanId);
+                const planDoc = await getDoc(planDocRef);
+                if (!planDoc.exists()) return;
+
+                const currentItineraries = planDoc.data().itineraries || [];
+                const updatedItineraries = currentItineraries
+                    .filter(item => item.id !== itineraryId)
+                    .map((item, index) => ({ ...item, order: index + 1 })); // 重新排序
+
+                await updateDoc(planDocRef, {
+                    itineraries: updatedItineraries
+                });
+                showMessage('行程卡片已刪除。');
+
+            } catch (e) {
+                console.error("刪除行程失敗:", e);
+                showMessage(`刪除行程失敗: ${e.message}`, true);
+            }
+        }
+
+
+        // --- UI Rendering Functions (HTML String Generation) ---
+
+        /** 渲染旅遊計畫列表 */
+        function renderPlanList() {
+            let planCardsHtml = '';
+
+            if (plans.length === 0) {
+                planCardsHtml = `
+                    <div class="col-span-full text-center py-10 bg-white rounded-xl shadow">
+                        <p class="text-xl text-gray-500">尚無旅遊計畫。點擊「新增計畫」開始規劃！</p>
+                    </div>
+                `;
+            } else {
+                planCardsHtml = plans.map(plan => `
+                    <div id="plan-card-${plan.id}" class="bg-white rounded-xl shadow-lg p-6 flex flex-col justify-between hover:shadow-xl transition duration-300 border-t-4 border-indigo-500">
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-800 mb-2">${plan.name}</h3>
+                            <div class="text-sm text-gray-500 space-y-1">
+                                <p class="flex items-center">
+                                    <svg class="w-4 h-4 mr-2 text-indigo-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                                    ${formatDate(plan.startDate)}
+                                </p>
+                                <p class="flex items-center">
+                                    <svg class="w-4 h-4 mr-2 text-indigo-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                                    ${formatDate(plan.endDate)}
+                                </p>
+                                ${plan.destination ? `
+                                <p class="flex items-center">
+                                    <svg class="w-4 h-4 mr-2 text-indigo-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                                    ${plan.destination}
+                                </p>` : ''}
+                            </div>
+                        </div>
+                        <div class="flex justify-end space-x-3 mt-4">
+                            <button data-plan-id="${plan.id}" onclick="event.stopPropagation(); handleDeletePlan('${plan.id}')"
+                                class="p-2 text-red-500 hover:text-red-700 transition duration-150 rounded-full hover:bg-red-50"
+                                title="刪除計畫">
+                                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M15 6V4c0-1-1-2-2-2h-2c-1 0-2 1-2 2v2"/></svg>
+                            </button>
+                            <button data-plan-id="${plan.id}" onclick="setActivePlan('${plan.id}')"
+                                class="bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-medium py-2 px-4 rounded-lg transition duration-300">
+                                查看行程
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            return `
+                <header class="flex justify-between items-center mb-6">
+                    <h1 class="text-3xl font-extrabold text-gray-900">我的旅遊計畫</h1>
+                    <button onclick="openAddPlanModal()"
+                        class="flex items-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-xl shadow-md transition duration-300 transform hover:scale-105">
+                        <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                        新增計畫
+                    </button>
+                </header>
+                <p class="mb-4 text-sm text-gray-600">當前用戶 ID: <span class="font-mono text-xs bg-gray-200 p-1 rounded">${currentUserId || 'N/A'}</span></p>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    ${planCardsHtml}
+                </div>
+            `;
+        }
+
+        /** 渲染行程卡片 */
+        function renderItineraryCard(item) {
+            return `
+                <div class="bg-white rounded-xl shadow-md p-5 border-l-4 border-emerald-500 relative ml-4 transition duration-300 hover:shadow-lg">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <div class="flex items-center text-sm font-medium text-emerald-600 mb-1">
+                                <svg class="w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                ${item.time || '全天'}
+                            </div>
+                            <h4 class="text-lg font-bold text-gray-800 mb-2">${item.activity}</h4>
+                            ${item.location ? `
+                            <p class="text-sm text-gray-600 flex items-center">
+                                <svg class="w-4 h-4 mr-1 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                                地點: ${item.location}
+                            </p>` : ''}
+                            ${item.notes && item.notes !== '無備註' ? `
+                            <p class="text-sm text-gray-500 mt-2 italic border-t border-gray-100 pt-2">
+                                備註: ${item.notes}
+                            </p>` : ''}
+                        </div>
+                        <button onclick="handleDeleteItinerary('${item.id}')"
+                            class="p-1 text-red-400 hover:text-red-600 transition duration-150 rounded-full"
+                            title="刪除行程">
+                            <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M15 6V4c0-1-1-2-2-2h-2c-1 0-2 1-2 2v2"/></svg>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        /** 渲染單日行程分組 */
+        function renderDayItinerary(date, day, items) {
+            // 對行程按時間排序，確保順序正確
+            const sortedItems = items.sort((a, b) => (a.time || '23:59').localeCompare(b.time || '23:59'));
+
+            const itemsHtml = sortedItems.length === 0 
+                ? `<div class="text-gray-500 italic ml-4">這一天還沒有安排行程。</div>`
+                : sortedItems.map(renderItineraryCard).join('');
+
+            return `
+                <div class="relative border-l-4 border-indigo-300 ml-4 pl-6">
+                    <!-- 日期標籤 -->
+                    <div class="absolute -left-3 top-0 bg-indigo-600 text-white px-3 py-1 rounded-full text-sm font-bold shadow-md">
+                        Day ${day}
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-6 mt-0 pt-0 ml-4">${formatDate(date)}</h3>
+
+                    <div class="space-y-6">
+                        ${itemsHtml}
+                        <!-- 新增行程按鈕 -->
+                        <button onclick="openAddItineraryModal('${date}')"
+                            class="flex items-center justify-center w-full max-w-sm ml-4 bg-white border-2 border-dashed border-indigo-300 text-indigo-600 hover:bg-indigo-50 transition duration-150 py-3 rounded-xl shadow-sm font-medium">
+                            <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                            新增當日行程卡片
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        /** 渲染行程詳情頁面 */
+        function renderPlanDetail(plan) {
+            datesArray = getDatesArray(plan.startDate, plan.endDate);
+            
+            // 按日期分組行程
+            const groupedItineraries = datesArray.reduce((acc, { date, day }) => {
+                acc[date] = {
+                    day: day,
+                    items: (plan.itineraries || [])
+                        .filter(item => item.date === date)
+                        // Note: Sorting happens inside renderDayItinerary now to handle time/order
+                };
+                return acc;
+            }, {});
+
+            let dayItinerariesHtml = datesArray.map(({ date, day }) => {
+                const group = groupedItineraries[date];
+                return renderDayItinerary(date, day, group.items);
+            }).join('');
+
+            return `
+                <header class="mb-6 bg-white p-6 rounded-xl shadow-lg border-b-4 border-indigo-600">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <button onclick="activePlanId = null; renderApp();" class="text-indigo-600 hover:text-indigo-800 transition mb-2 flex items-center">
+                                &larr; 返回計畫列表
+                            </button>
+                            <h1 class="text-3xl font-extrabold text-gray-900">${plan.name}</h1>
+                            <p class="text-md text-gray-500 mt-1">${formatDate(plan.startDate)} ~ ${formatDate(plan.endDate)} (${datesArray.length} 天)</p>
+                            ${plan.destination ? `
+                            <p class="text-sm text-gray-600 mt-2 flex items-center">
+                                <svg class="w-4 h-4 mr-1 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                                ${plan.destination}
+                            </p>` : ''}
+                        </div>
+                        <button onclick="handleDeletePlan('${plan.id}')"
+                            class="p-3 text-red-500 hover:text-red-700 transition duration-150 rounded-full hover:bg-red-50 border border-red-200"
+                            title="刪除此計畫">
+                            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M15 6V4c0-1-1-2-2-2h-2c-1 0-2 1-2 2v2"/></svg>
+                        </button>
+                    </div>
+                </header>
+                <div class="space-y-10">
+                    ${dayItinerariesHtml}
+                </div>
+            `;
+        }
+
+        // --- Core Application Logic ---
+
+        /** 重新渲染應用程式主體 */
+        window.renderApp = function() {
+            const appContainer = document.getElementById('app');
+            if (!appContainer) return;
+            
+            const activePlan = plans.find(p => p.id === activePlanId);
+
+            if (activePlanId && activePlan) {
+                appContainer.innerHTML = renderPlanDetail(activePlan);
+                // 必須重新填充行程 Modal 的日期選項
+                populateItineraryDates(activePlan);
+            } else {
+                appContainer.innerHTML = renderPlanList();
+            }
+        }
+
+        /** 設定活躍計畫 ID 並重新渲染 */
+        window.setActivePlan = function(planId) {
+            activePlanId = planId;
+            renderApp();
+        }
+
+        // --- Modal Control ---
+
+        function openAddPlanModal() {
+            document.getElementById('addPlanModal').classList.add('open');
+            document.getElementById('addPlanForm').reset();
+        }
+
+        function closeAddPlanModal() {
+            document.getElementById('addPlanModal').classList.remove('open');
+        }
+
+        /** 打開新增行程 Modal 並預設日期 */
+        window.openAddItineraryModal = function(preselectedDate = null) {
+            const modal = document.getElementById('addItineraryModal');
+            const dateSelect = document.getElementById('itineraryDate');
+            
+            // 確保日期下拉菜單中的值被正確預選
+            if (preselectedDate) {
+                dateSelect.value = preselectedDate;
+            } else if (datesArray.length > 0) {
+                 dateSelect.value = datesArray[0].date;
+            }
+            
+            modal.classList.add('open');
+            document.getElementById('addItineraryForm').reset();
+            // 由於重置會清空，需要重新設定日期
+            if (preselectedDate) {
+                 dateSelect.value = preselectedDate;
+            }
+        }
+
+        function closeAddItineraryModal() {
+            document.getElementById('addItineraryModal').classList.remove('open');
+        }
+
+        /** 填充新增行程 Modal 中的日期下拉選單 */
+        function populateItineraryDates(activePlan) {
+            const dateSelect = document.getElementById('itineraryDate');
+            if (!dateSelect) return;
+
+            datesArray = getDatesArray(activePlan.startDate, activePlan.endDate);
+            dateSelect.innerHTML = datesArray.map(d => 
+                `<option value="${d.date}">Day ${d.day} - ${formatDate(d.date)}</option>`
+            ).join('');
+        }
+        
+        // --- Event Listeners and Init ---
+
+        /** 註冊表單提交事件 */
+        document.getElementById('addPlanForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const name = document.getElementById('planName').value.trim();
+            const destination = document.getElementById('planDestination').value.trim();
+            const startDate = document.getElementById('planStartDate').value;
+            const endDate = document.getElementById('planEndDate').value;
+
+            if (!name || !startDate || !endDate) {
+                showMessage('請填寫計畫名稱、開始日期和結束日期。', true);
+                return;
+            }
+
+            if (new Date(startDate) > new Date(endDate)) {
+                showMessage('開始日期不能晚於結束日期。', true);
+                return;
+            }
+
+            handleAddPlan({ name, destination, startDate, endDate });
+        });
+        
+        document.getElementById('addItineraryForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const activity = document.getElementById('itineraryActivity').value.trim();
+            const date = document.getElementById('itineraryDate').value;
+            const time = document.getElementById('itineraryTime').value;
+            const location = document.getElementById('itineraryLocation').value.trim();
+            const notes = document.getElementById('itineraryNotes').value.trim();
+
+            if (!activity || !date) {
+                showMessage('請填寫活動名稱和日期。', true);
+                return;
+            }
+
+            handleAddItinerary({ activity, date, time, location, notes });
+        });
+        
+        // 暴露給全局，以便在 HTML 屬性中調用
+        window.handleDeletePlan = handleDeletePlan;
+        window.handleDeleteItinerary = handleDeleteItinerary;
+        window.openAddPlanModal = openAddPlanModal;
+        window.closeAddPlanModal = closeAddPlanModal;
+        
+        /** 應用程式啟動與 Firebase 初始化 */
+        async function initializeAppAndFirebase() {
+            
+            try {
+                setLogLevel('Debug');
+                const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
-                firebaseInitialized = true; 
-                
-                // 啟動認證流程
-                handleSignIn();
+                auth = getAuth(app);
+
+                // 處理身份驗證
+                const handleAuth = async (user) => {
+                    if (user) {
+                        currentUserId = user.uid;
+                        isAuthenticated = true;
+                        subscribeToPlans();
+                    } else {
+                        currentUserId = null;
+                        isAuthenticated = false;
+                        // 在 GitHub Pages 上使用匿名登入
+                        await signInAnonymously(auth);
+                    }
+                    if (document.getElementById('app').innerHTML.includes('載入中')) {
+                         renderApp(); // 第一次登入成功後渲染
+                    }
+                };
+
+                // 等待或執行身份驗證
+                onAuthStateChanged(auth, handleAuth);
 
             } catch (e) {
                 console.error("Firebase 初始化失敗:", e);
-                displayError('應用程式初始化錯誤：' + e.message);
+                document.getElementById('app').innerHTML = `
+                    <div class="text-center bg-red-50 p-6 rounded-xl shadow-lg mt-8">
+                        <h2 class="text-xl font-bold text-red-600 mb-2">Firebase 啟動失敗</h2>
+                        <p class="text-gray-700">${e.message}</p>
+                    </div>
+                `;
             }
         }
 
-        async function handleSignIn() {
-            if (!firebaseInitialized) return;
+        /** 訂閱旅遊計畫列表 */
+        function subscribeToPlans() {
+            if (!isAuthenticated || !currentUserId || !db) return;
 
-            try {
-                // *** 核心變動：使用 signInWithEmailAndPassword 登入 ***
-                console.log(`嘗試使用測試帳號 ${TEST_EMAIL} 登入...`);
-                const userCredential = await signInWithEmailAndPassword(auth, TEST_EMAIL, TEST_PASSWORD);
-                
-                currentUserId = userCredential.user.uid;
-                console.log("登入成功，用戶 ID:", currentUserId);
-                
-                // 顯示主應用程式介面
-                statusContainer.classList.add('hidden');
-                appContainer.classList.remove('hidden');
+            const plansCollectionRef = collection(db, `artifacts/${appId}/users/${currentUserId}/travel_plans`);
+            // 由於 Firestore 的排序限制，我們僅在客戶端進行排序，但在這裏仍然指定時間戳以確保一致性
+            const q = query(plansCollectionRef);
 
-                // 開始載入行程資料
-                startTripListener(currentUserId);
-                userIdDisplay.textContent = currentUserId;
-                addTripFab.disabled = false;
-
-            } catch (error) {
-                console.error("登入失敗:", error);
-                // 提供更明確的錯誤訊息，指示可能是帳密問題
-                displayError(`身份驗證失敗：${error.message}。請確認測試帳號 ${TEST_EMAIL} 已在 Firebase 專案中註冊並啟用。`);
-            }
-        }
-
-        // --- 3. 核心應用程式邏輯 ---
-        
-        // 簡易的通用 Modal 替換 confirm/alert
-        const showConfirmModal = (message, onConfirm) => {
-            // 在 Canvas 環境中，我們使用 window.confirm 作為臨時替代
-            if (window.confirm(message)) {
-                onConfirm();
-            }
-        };
-        const showSimpleMessage = (title, message, type) => {
-             // 在 Canvas 環境中，我們使用 alert 作為臨時替代
-             alert(`${title}: ${message}`);
-        };
-
-
-        // 登出按鈕事件處理
-        logoutButton.addEventListener('click', async () => {
-            showConfirmModal('您確定要登出嗎？', async () => {
-                try {
-                    if (unsubscribe) {
-                         unsubscribe(); // 取消監聽
-                    }
-                    await signOut(auth);
-                    // 登出成功後，強制重新載入頁面，會再次觸發登入流程
-                    window.location.reload(); 
-                } catch (error) {
-                    console.error("登出失敗:", error);
-                    showSimpleMessage('錯誤', '登出失敗: ' + error.message, 'error'); 
-                }
-            });
-        });
-
-
-        // 顯示/隱藏刪除確認 Modal
-        const showDeleteModal = (tripId, name) => {
-            tripToDeleteId = tripId;
-            document.getElementById('delete-modal-message').innerHTML = `您確定要刪除行程 <strong>${name}</strong> 嗎？<br>此操作無法復原，並會刪除所有行程日資料。`;
-            deleteModal.classList.remove('hidden');
-        };
-
-        const hideDeleteModal = () => {
-            deleteModal.classList.add('hidden');
-            tripToDeleteId = null;
-        };
-        
-        // 刪除操作邏輯
-        const handleDeleteTrip = async () => {
-            if (!tripToDeleteId || !currentUserId || !db) return;
-
-            const deletingTripId = tripToDeleteId;
-            hideDeleteModal(); 
-            
-            try {
-                // 刪除主行程文件 (在 Firestore 規則中，這應該會阻止刪除帶有子集合的文件，但我們目前假設只有頂層文件)
-                const tripRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'trips', deletingTripId);
-                await deleteDoc(tripRef);
-                
-                console.log(`行程 ${deletingTripId} 刪除成功.`);
-
-            } catch (error) {
-                console.error("刪除行程失敗:", error);
-                showSimpleMessage('錯誤', `刪除行程失敗: ${error.message}`, 'error');
-            }
-        };
-
-        // 設置刪除 Modal 的事件監聽器
-        confirmDeleteButton.addEventListener('click', handleDeleteTrip);
-        cancelDeleteButton.addEventListener('click', hideDeleteModal);
-        
-        
-        // --- 渲染單個行程卡片 ---
-        const renderTripCard = (trip) => {
-            const usersIconSvg = lucide.createIcons()['users'].toSvg({ class: 'h-3 w-3 mr-1' });
-            const chevronIconSvg = lucide.createIcons()['chevron-right'].toSvg({ class: 'h-6 w-6' });
-
-            const cardWrapper = document.createElement('div');
-            cardWrapper.className = 'flex items-center space-x-2';
-            
-            const card = document.createElement('div');
-            card.dataset.id = trip.id; 
-            card.className = 'trip-card bg-white p-5 rounded-xl shadow-lg border border-gray-100 cursor-pointer flex-grow flex items-center justify-between';
-            card.innerHTML = `
-                <div>
-                    <h3 class="text-lg font-semibold text-gray-800">${trip.name}</h3>
-                    <p class="text-sm text-gray-500 mt-1">
-                        <span class="mr-3">天數: ${trip.days}</span>
-                        <span class="text-xs inline-flex items-center font-medium bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
-                            ${usersIconSvg}
-                            共編: ${trip.memberCount || 1}
-                        </span>
-                    </p>
-                    <p class="text-xs text-gray-400 mt-2">最後更新: ${trip.lastUpdated ? new Date(trip.lastUpdated.seconds * 1000).toLocaleString('zh-TW') : 'N/A'}</p>
-                </div>
-                <div class="text-indigo-500">
-                    ${chevronIconSvg}
-                </div>
-            `;
-            
-            const deleteButton = document.createElement('button');
-            deleteButton.className = 'p-3 text-red-500 hover:text-red-700 rounded-full hover:bg-red-50 transition duration-150 flex-shrink-0';
-            deleteButton.title = '刪除此行程';
-            deleteButton.innerHTML = lucide.createIcons()['trash-2'].toSvg({ class: 'h-6 w-6' });
-
-            // 點擊事件：暫時使用 alert 提示，因為詳細行程頁尚未創建
-            card.addEventListener('click', () => {
-                showSimpleMessage('導航提示', `您點擊了行程: ${trip.name} (ID: ${trip.id})。\n\n下一步可以創建一個名為 trip.html 的新檔案來編輯詳細行程。`, 'info');
-            });
-            
-            // 刪除按鈕事件
-            deleteButton.addEventListener('click', (e) => {
-                e.stopPropagation(); 
-                showDeleteModal(trip.id, trip.name);
-            });
-            
-            cardWrapper.appendChild(card);
-            cardWrapper.appendChild(deleteButton);
-
-            return cardWrapper;
-        };
-
-
-        // --- 啟動 Firestore 監聽 ---
-        const startTripListener = (userId) => {
-            if (!firebaseInitialized) return;
-
-            // 定義行程集合的路徑: /artifacts/{APP_ID}/public/data/trips
-            const tripsCollectionRef = collection(db, 'artifacts', APP_ID, 'public', 'data', 'trips');
-            const q = query(tripsCollectionRef); 
-
-            if (unsubscribe) {
-                unsubscribe();
-            }
-
-            // 實時監聽 (onSnapshot)
-            unsubscribe = onSnapshot(q, (querySnapshot) => {
-                const trips = [];
-                querySnapshot.forEach((doc) => {
-                    const data = doc.data();
-                    trips.push({
-                        id: doc.id,
-                        name: data.name || '未命名行程',
-                        days: data.days || 1,
-                        memberCount: data.members ? data.members.length : 1, 
-                        lastUpdated: data.updatedAt 
-                    });
-                });
-
-                // 在客戶端排序，依據最後更新時間降序排列
-                trips.sort((a, b) => {
-                    const dateA = a.lastUpdated ? a.lastUpdated.seconds : 0;
-                    const dateB = b.lastUpdated ? b.lastUpdated.seconds : 0;
+            onSnapshot(q, (snapshot) => {
+                plans = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data(),
+                })).sort((a, b) => {
+                    // 在客戶端按建立時間倒序排序
+                    const dateA = a.createdAt?.toDate() || new Date(0);
+                    const dateB = b.createdAt?.toDate() || new Date(0);
                     return dateB - dateA;
                 });
-
-                // 渲染 UI
-                tripListElement.innerHTML = '';
-                if (trips.length === 0) {
-                    noTripsMessage.classList.remove('hidden');
-                } else {
-                    noTripsMessage.classList.add('hidden');
-                    trips.forEach(trip => {
-                        tripListElement.appendChild(renderTripCard(trip));
-                    });
-                }
-            }, (error) => {
-                console.error("Firestore 監聽失敗:", error);
-                showSimpleMessage('錯誤', "無法載入行程列表，請檢查網路或權限設定。", 'error');
-                noTripsMessage.classList.remove('hidden'); 
-                noTripsMessage.innerHTML = `<span class="text-red-500">載入失敗！${error.code}</span>`;
+                
+                // 每次資料更新時，重新渲染 App
+                renderApp();
+            }, (err) => {
+                console.error("Firestore 訂閱失敗:", err);
+                showMessage(`資料讀取失敗: ${err.message}`, true);
             });
-        };
+        }
 
-
-        // 點擊 '+' 按鈕新增行程的邏輯
-        addTripFab.addEventListener('click', () => {
-            if (!currentUserId) {
-                 showSimpleMessage('提示', "請先登入以創建行程！", 'info');
-                 return;
-            }
-            // 顯示自定義 Modal
-            newTripModal.classList.remove('hidden');
-            newTripNameInput.focus();
-        });
-        
-        // 取消按鈕邏輯
-        cancelNewTripButton.addEventListener('click', () => {
-            newTripModal.classList.add('hidden');
-            newTripForm.reset(); 
-        });
-
-        // 表單提交邏輯
-        newTripForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            if (!currentUserId || !db) return;
-
-            const tripName = newTripNameInput.value.trim();
-            if (!tripName) return; 
-            
-            createTripButton.disabled = true;
-            createTripButton.textContent = '建立中...';
-            
-            try {
-                const userId = currentUserId;
-                const newTripRef = collection(db, 'artifacts', APP_ID, 'public', 'data', 'trips');
-
-                // 準備新的行程資料
-                const newTripData = {
-                    name: tripName,
-                    days: 1, // 預設 1 天
-                    members: [userId], 
-                    createdAt: serverTimestamp(),
-                    updatedAt: serverTimestamp(),
-                };
-                
-                // 寫入 Firestore
-                const docRef = await addDoc(newTripRef, newTripData);
-                console.log("新行程文件寫入成功，ID:", docRef.id);
-                
-                // 隱藏 Modal
-                newTripModal.classList.add('hidden');
-                newTripForm.reset(); 
-                
-                showSimpleMessage('建立成功', `新的行程 "${tripName}" 已創建！您可以繼續在列表中編輯。`, 'success');
-                
-            } catch (error) {
-                console.error("新增行程失敗:", error);
-                showSimpleMessage('錯誤', "新增行程失敗：" + error.message, 'error');
-            } finally {
-                createTripButton.disabled = false;
-                createTripButton.textContent = '建立';
-            }
-        });
-
-        // 當頁面被卸載時，取消 Firestore 的監聽
-        window.addEventListener('beforeunload', () => {
-            if (unsubscribe) {
-                unsubscribe();
-                console.log("Firestore 監聽已取消。");
-            }
-        });
-
+        // 啟動應用程式
+        initializeAppAndFirebase();
     </script>
 </body>
 </html>
